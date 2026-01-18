@@ -170,14 +170,14 @@ const Dashboard: React.FC<DashboardProps> = ({
       .filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren')
       .reduce((sum, p) => sum + (p.volume || 0), 0);
 
-    // Volumen im aktuellen Kalenderjahr
+    // Volumen im aktuellen Kalenderjahr (nur gewonnene Deals)
     const volumeCurrentYear = projects
-      .filter(p => new Date(p.created_at).getFullYear() === currentYear)
+      .filter(p => p.status === 'Gewonnen' && new Date(p.created_at).getFullYear() === currentYear)
       .reduce((sum, p) => sum + (p.volume || 0), 0);
 
-    // Vergleich zum Vorjahr für den Trend-Indikator
+    // Vergleich zum Vorjahr für den Trend-Indikator (nur gewonnene Deals)
     const volumePrevYear = projects
-      .filter(p => new Date(p.created_at).getFullYear() === currentYear - 1)
+      .filter(p => p.status === 'Gewonnen' && new Date(p.created_at).getFullYear() === currentYear - 1)
       .reduce((sum, p) => sum + (p.volume || 0), 0);
 
     const volumeChange = volumePrevYear > 0 
@@ -383,37 +383,48 @@ const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left table-fixed">
             <thead>
-              <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <th className="px-6 py-3">Projekt</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Kunde</th>
-                <th className="px-6 py-3">Erstellt</th>
+              <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4 w-1/5">Projekt & Kunde</th>
+                <th className="px-6 py-4 w-1/5">Auftragsvolumen</th>
+                <th className="px-6 py-4 w-1/5">Standort</th>
+                <th className="px-6 py-4 w-1/5">Status</th>
+                <th className="px-6 py-4 w-1/5">Erstellt am</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {projects.length === 0 ? (
+              {projects.filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren').length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400 text-xs">Noch keine Projekte vorhanden.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-xs">Noch keine aktiven Projekte vorhanden.</td>
                 </tr>
               ) : (
-                projects.slice(0, 4).map((p) => (
-                  <tr 
-                    key={p.id} 
-                    onClick={() => onNavigateToProject(p.id)}
-                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
-                  >
-                    <td className="px-6 py-4">
-                      <p className="text-xs font-bold text-slate-800 group-hover:text-[#82a8a4] transition-colors">{p.name}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={p.status} />
-                    </td>
-                    <td className="px-6 py-4 text-xs font-medium text-slate-600">{p.company_name}</td>
-                    <td className="px-6 py-4 text-xs font-medium text-slate-500">{new Date(p.created_at).toLocaleDateString()}</td>
-                  </tr>
-                ))
+                projects
+                  .filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren')
+                  .slice(0, 4)
+                  .map((p) => (
+                    <tr 
+                      key={p.id} 
+                      onClick={() => onNavigateToProject(p.id)}
+                      className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                    >
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-bold text-slate-800 group-hover:text-[#82a8a4] transition-colors">{p.name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{p.company_name}</p>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-slate-700">
+                        {p.volume 
+                          ? `${p.volume.toLocaleString('de-DE')} €` 
+                          : <span className="text-slate-300 font-normal italic text-[10px]">Kein Angebot</span>
+                        }
+                      </td>
+                      <td className="px-6 py-4 text-xs font-medium text-slate-600">{p.location_city}</td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={p.status} />
+                      </td>
+                      <td className="px-6 py-4 text-xs font-medium text-slate-500">{new Date(p.created_at).toLocaleDateString('de-DE')}</td>
+                    </tr>
+                  ))
               )}
             </tbody>
           </table>
