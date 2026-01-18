@@ -24,6 +24,7 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -71,12 +72,13 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
         p_street: formData.street,
         p_zip: formData.zip,
         p_city: formData.city,
-        p_country: formData.country
+        p_country: formData.country,
+        p_email: formData.email,
       });
 
       if (rpcError) throw rpcError;
 
-      onRegisterSuccess();
+      setIsSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Registrierung fehlgeschlagen.');
       console.error(err);
@@ -85,14 +87,34 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
     }
   };
 
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 p-10 text-center animate-in fade-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Mail size={40} />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-4">Fast geschafft!</h2>
+          <p className="text-slate-500 text-sm leading-relaxed mb-8">
+            Wir haben Ihnen eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet. 
+            Bitte klicken Sie auf den Link in der Mail, um Ihr Konto zu aktivieren.
+          </p>
+          <button
+            onClick={onBackToLogin}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]"
+          >
+            Zurück zum Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4 py-12">
       <div className="max-w-2xl w-full">
         {/* Header */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="w-16 h-16 bg-[#82a8a4] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#82a8a4]/20">
-            <UserPlus className="text-white" size={32} strokeWidth={1.5} />
-          </div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight mb-1">Partner werden</h1>
           <p className="text-slate-500 text-sm">Erstellen Sie Ihr Konto für das Vermittler Portal</p>
         </div>

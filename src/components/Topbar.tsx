@@ -4,8 +4,7 @@ import {
   ChevronDown, 
   Menu,
   User as UserIcon,
-  LogOut,
-  Settings
+  LogOut
 } from 'lucide-react';
 import { ViewType, User, UserCompany } from '../types';
 
@@ -68,7 +67,9 @@ const Topbar: React.FC<TopbarProps> = ({ currentView, onSidebarToggle, onNavigat
             <p className="text-sm font-semibold text-slate-800 leading-none">
               {userProfile ? `${userProfile.fname} ${userProfile.lname}` : 'Lädt...'}
             </p>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">Administrator</p>
+            <p className="text-[10px] text-slate-400 font-medium mt-1">
+              {userCompany?.name || 'Administrator'}
+            </p>
           </div>
           <ChevronDown 
             size={14} 
@@ -78,45 +79,32 @@ const Topbar: React.FC<TopbarProps> = ({ currentView, onSidebarToggle, onNavigat
 
         {/* Dropdown Menu */}
         {isMenuOpen && (
-          <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-2">
+          <div className="absolute top-full right-0 mt-2 w-44 bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="p-1.5">
               <button 
                 onClick={() => {
                   onNavigate('profile');
                   setIsMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-[#82a8a4] rounded-xl transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-[#82a8a4] rounded-xl transition-colors uppercase tracking-wider"
               >
-                <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
-                  <UserIcon size={16} />
+                <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
+                  <UserIcon size={14} />
                 </div>
-                Zum Profil
-              </button>
-              
-              <button 
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
-              >
-                <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
-                  <Settings size={16} />
-                </div>
-                Einstellungen
+                Profil
               </button>
 
               <div className="my-1 border-t border-slate-50"></div>
 
               <button 
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors uppercase tracking-wider"
               >
-                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-                  <LogOut size={16} />
+                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+                  <LogOut size={14} />
                 </div>
                 Logout
               </button>
-            </div>
-            
-            <div className="bg-slate-50 px-4 py-2 text-[10px] text-slate-400 font-medium border-t border-slate-100">
-              {userCompany?.name || 'Partner Portal'} v1.4.2
             </div>
           </div>
         )}

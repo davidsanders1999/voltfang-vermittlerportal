@@ -39,9 +39,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
       <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="w-20 h-20 bg-[#82a8a4] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[#82a8a4]/20">
-            <LogIn className="text-white" size={40} strokeWidth={1.5} />
-          </div>
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight mb-2">Willkommen zurück</h1>
           <p className="text-slate-500 text-sm">Voltfang Vermittler Portal</p>
         </div>

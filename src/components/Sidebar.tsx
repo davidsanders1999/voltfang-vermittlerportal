@@ -47,11 +47,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       <aside className={sidebarClasses} style={{ backgroundColor: '#2d2d3a' }}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#82a8a4] rounded-lg flex items-center justify-center">
-              <Zap className="text-white" size={18} fill="currentColor" />
-            </div>
-            <span className="text-xl font-bold text-white tracking-tight">VOLTFANG</span>
+          <div className="p-6 border-b border-white/5">
+            <img 
+              src="/Logo_gruen.svg" 
+              alt="Voltfang Logo" 
+              className="h-10 w-auto"
+            />
           </div>
 
           {/* Navigation */}
@@ -81,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-4 border-t border-white/5">
             <button 
               onClick={() => onNavigate('profile')}
-              className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors group text-left ${currentView === 'profile' ? 'bg-white/10' : 'hover:bg-white/5'}`}
+              className="w-full flex items-center gap-3 p-2 rounded-lg transition-colors group text-left hover:bg-white/5"
             >
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-slate-400 ring-2 ring-white/5 group-hover:ring-white/10 transition-all">
                 <UserIcon size={18} />

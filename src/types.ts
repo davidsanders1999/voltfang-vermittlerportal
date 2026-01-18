@@ -32,6 +32,8 @@ export interface Project {
   estimated_capacity?: EstimatedCapacity;
   created_at: string;
   company_id?: string;
+  hubspot_id?: string;
+  vf_contact_name?: string;
 }
 
 export type ViewType = 'dashboard' | 'projekte' | 'academy' | 'profile';

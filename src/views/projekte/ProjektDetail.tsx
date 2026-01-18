@@ -57,10 +57,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                      <Navigation size={12} className="text-[#82a8a4]" />
                      {project.location_city}, {project.location_country}
                    </div>
-                   <div className="flex items-center gap-1.5">
-                     <Clock size={12} className="text-[#82a8a4]" />
-                     ID: {project.id.slice(0, 8)}...
-                   </div>
+
                 </div>
               </div>
             </div>
@@ -113,7 +110,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
                     <User size={14} />
                   </div>
-                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Ansprechpartner</h3>
+                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Ansprechpartner (Extern)</h3>
                 </div>
                 <div className="pl-10 space-y-4">
                   <div className="flex flex-col">
@@ -130,6 +127,23 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                         <Phone size={14} className="text-[#82a8a4]/50" /> {project.contact_phone || 'Keine Angabe'}
                       </div>
                     </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-5">
+                <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
+                  <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
+                    <User size={14} />
+                  </div>
+                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Ansprechpartner (Voltfang)</h3>
+                </div>
+                <div className="pl-10">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Name</span>
+                    <span className="text-xs font-bold text-slate-700">
+                      {project.vf_contact_name || 'Wird intern vergeben...'}
+                    </span>
                   </div>
                 </div>
               </section>

@@ -123,9 +123,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     }, {} as Record<string, number>);
 
     return [
-      { status: 'Qualifizierung', count: statusCounts['Lead übergeben'] || 0 },
+      { status: 'Lead übergeben', count: statusCounts['Lead übergeben'] || 0 },
       { status: 'Technische Klärung', count: statusCounts['Technische Klärung'] || 0 },
-      { status: 'Angebot', count: statusCounts['Closing'] || 0 },
+      { status: 'Vertragliche Klärung', count: statusCounts['Vertragliche Klärung'] || 0 },
+      { status: 'Closing', count: statusCounts['Closing'] || 0 },
       { status: 'Gewonnen', count: statusCounts['Gewonnen'] || 0 },
       { status: 'Verloren', count: statusCounts['Verloren'] || 0 },
     ];
@@ -234,43 +235,98 @@ const Dashboard: React.FC<DashboardProps> = ({
               <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={12} />
             </div>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[400px] w-full mt-auto">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueTrendData}>
+              <BarChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#82a8a4" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#82a8a4" stopOpacity={0.6} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94a3b8'}} tickFormatter={(v) => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : `${v/1000}k`} />
-                <Tooltip 
-                  cursor={{fill: '#f8fafc'}}
-                  formatter={(value: number) => [formatCurrency(value), 'Umsatz']}
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 600}} 
+                  dy={10}
                 />
-                <Bar dataKey="rev" fill="#82a8a4" radius={[4, 4, 0, 0]} name="Umsatz (€)" />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 600}} 
+                  tickFormatter={(v) => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${v/1000}k` : v} 
+                />
+                <Tooltip 
+                  cursor={{fill: '#f8fafc', radius: 8}}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-3 shadow-xl rounded-2xl border border-slate-50 animate-in fade-in zoom-in duration-200">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{payload[0].payload.month}</p>
+                          <p className="text-sm font-bold text-slate-800">{formatCurrency(payload[0].value as number)}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar 
+                  dataKey="rev" 
+                  fill="url(#barGradient)" 
+                  radius={[6, 6, 0, 0]} 
+                  barSize={32}
+                  name="Umsatz (€)" 
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Pipeline Funnel (Aktuell)</h3>
-          <div className="flex-1 space-y-5">
-            {funnelData.map((item: any, i: number) => (
-              <div key={i} className="space-y-1">
-                <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold">
-                  <span className="text-slate-400">{item.status}</span>
-                  <span className={item.status === 'Verloren' ? 'text-red-400' : 'text-[#82a8a4]'}>{item.count} Projekte</span>
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Pipeline Funnel</h3>
+          <div className="flex-1 space-y-4">
+            {funnelData.map((item: any, i: number) => {
+              const percentage = projects.length > 0 ? (item.count / projects.length) * 100 : 0;
+              const barColors: Record<string, string> = {
+                'Lead übergeben': 'bg-[#82a8a4]/30',
+                'Technische Klärung': 'bg-[#82a8a4]/50',
+                'Vertragliche Klärung': 'bg-[#82a8a4]/70',
+                'Closing': 'bg-[#82a8a4]/85',
+                'Gewonnen': 'bg-[#82a8a4]',
+                'Verloren': 'bg-red-400'
+              };
+
+              return (
+                <div key={i} className="group cursor-default">
+                  <div className="flex justify-between items-end mb-1.5 px-0.5">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight leading-none mb-1">
+                        {item.status}
+                      </span>
+                      <span className="text-[9px] font-medium text-slate-400">
+                        {item.count} {item.count === 1 ? 'Projekt' : 'Projekte'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-800 tabular-nums">
+                      {percentage.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-3 w-full bg-slate-50 rounded-lg overflow-hidden border border-slate-100/50 p-[1px]">
+                    <div 
+                      className={`h-full rounded-md transition-all duration-1000 ease-out shadow-sm ${barColors[item.status] || 'bg-[#82a8a4]'}`}
+                      style={{ 
+                        width: `${percentage}%`,
+                        opacity: projects.length > 0 ? 0.8 + (percentage / 100) * 0.2 : 1
+                      }}
+                    >
+                      <div className="w-full h-full bg-gradient-to-r from-white/10 to-transparent"></div>
+                    </div>
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-1000 ${item.status === 'Verloren' ? 'bg-red-400' : 'bg-[#82a8a4]'}`}
-                    style={{ 
-                      width: `${projects.length > 0 ? (item.count / projects.length) * 100 : 0}%`,
-                      opacity: item.status === 'Verloren' ? 1 : 1 - (i * 0.15)
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-8 pt-6 border-t border-slate-50 text-center">
              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Abschlussquote</p>
