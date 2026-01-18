@@ -1,6 +1,6 @@
 import React from 'react';
 import { ProjectStatus } from '../../types';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Crown } from 'lucide-react';
 
 export const ALL_PROJECT_STATUSES: ProjectStatus[] = [
   'Lead übergeben',
@@ -45,6 +45,7 @@ export const StatusBadge: React.FC<{
 
 export const PipelineVisualizer = ({ status }: { status: ProjectStatus }) => {
   const isLost = status === 'Verloren';
+  const isWon = status === 'Gewonnen';
   const phases = isLost ? [...PIPELINE_PHASES.slice(0, 4), 'Verloren'] : PIPELINE_PHASES;
   const currentIndex = phases.indexOf(status);
 
@@ -55,22 +56,27 @@ export const PipelineVisualizer = ({ status }: { status: ProjectStatus }) => {
         {phases.map((phase, idx) => {
           const isCompleted = idx < currentIndex;
           const isActive = idx === currentIndex;
+          const isPhaseWon = phase === 'Gewonnen' && isActive;
+
           return (
             <div key={phase} className="relative z-10 flex flex-col items-center flex-1">
               <div className={`
-                w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500
-                ${isActive ? (isLost ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-200' : 'bg-[#82a8a4] border-[#82a8a4] text-white shadow-lg shadow-[#82a8a4]/30') : 
+                w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-700
+                ${isPhaseWon ? 'bg-yellow-400 border-yellow-500 text-white animate-gold shadow-lg shadow-yellow-200' : 
+                  isActive ? (isLost ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-200' : 'bg-[#82a8a4] border-[#82a8a4] text-white shadow-lg shadow-[#82a8a4]/30') : 
                   isCompleted ? 'bg-slate-800 border-slate-800 text-white' : 
                   'bg-white border-slate-200 text-slate-300'}
-              `}>
-                {isCompleted ? <CheckCircle2 size={18} /> : 
+              `} style={{ transitionDelay: `${idx * 150}ms` }}>
+                {isPhaseWon ? <Crown size={20} fill="currentColor" /> : 
+                 isCompleted ? <CheckCircle2 size={18} /> : 
                  (phase === 'Verloren' ? <XCircle size={18} /> : <span className="text-xs font-bold">{idx + 1}</span>)}
               </div>
               <p className={`
-                mt-3 text-[9px] font-bold uppercase tracking-tight text-center px-2
-                ${isActive ? (isLost ? 'text-red-500' : 'text-[#82a8a4]') : 
+                mt-3 text-[9px] font-bold uppercase tracking-tight text-center px-2 transition-colors duration-500
+                ${isPhaseWon ? 'text-yellow-600' : 
+                  isActive ? (isLost ? 'text-red-500' : 'text-[#82a8a4]') : 
                   isCompleted ? 'text-slate-800' : 'text-slate-400'}
-              `}>
+              `} style={{ transitionDelay: `${idx * 150}ms` }}>
                 {phase}
               </p>
             </div>

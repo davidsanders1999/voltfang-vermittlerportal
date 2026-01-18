@@ -58,4 +58,5 @@ export interface User {
   email?: string; // Not in DB table but usually available via auth
   phone?: string;
   created_at: string;
+  is_unlocked: boolean;
 }

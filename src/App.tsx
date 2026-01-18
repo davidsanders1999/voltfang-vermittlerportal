@@ -161,6 +161,30 @@ const App: React.FC = () => {
     return <ResetPassword onSuccess={() => setAuthView('login')} />;
   }
 
+  // Zugriffsbeschränkung: Nutzer muss freigeschaltet sein
+  if (userProfile && !userProfile.is_unlocked) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-50 p-4 text-center">
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 p-10 animate-in fade-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-4">Konto noch nicht freigeschaltet</h2>
+          <p className="text-slate-500 text-sm leading-relaxed mb-8">
+            Vielen Dank für Ihre Registrierung! Ihr Zugang wird aktuell von unserem Team geprüft. 
+            Wir benachrichtigen Sie per E-Mail, sobald Ihr Konto freigeschaltet wurde.
+          </p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]"
+          >
+            Abmelden
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar 
