@@ -2,10 +2,17 @@ import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { Lock, Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
 
+/**
+ * Props für die ResetPassword-Komponente
+ * @property onSuccess - Callback, wenn das Passwort erfolgreich geändert wurde
+ */
 interface ResetPasswordProps {
   onSuccess: () => void;
 }
 
+/**
+ * Ansicht zum Setzen eines neuen Passworts (wird über den Recovery-Link aus der Mail erreicht)
+ */
 const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -13,8 +20,13 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  /**
+   * Aktualisiert das Passwort des Nutzers im Supabase Auth System
+   */
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Einfache Validierung vorab
     if (password !== confirmPassword) {
       setError('Die Passwörter stimmen nicht überein.');
       return;
@@ -24,10 +36,13 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
     setError(null);
 
     try {
+      // Supabase updateUser Methode zum Ändern des Passworts
       const { error } = await supabase.auth.updateUser({ password });
 
       if (error) throw error;
+      
       setSuccess(true);
+      // Kurze Verzögerung, damit der User die Bestätigung lesen kann
       setTimeout(() => {
         onSuccess();
       }, 3000);
@@ -38,6 +53,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
     }
   };
 
+  // Erfolgsseite nach Passwort-Änderung
   if (success) {
     return (
       <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4">
@@ -62,8 +78,10 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
           <p className="text-slate-500 text-sm">Bitte geben Sie Ihr neues Passwort ein.</p>
         </div>
 
+        {/* Passwort-Reset Formular */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 p-8 md:p-10">
           <form onSubmit={handleReset} className="space-y-6">
+            {/* Erstes Passwort-Feld */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Neues Passwort</label>
               <div className="relative group">
@@ -82,6 +100,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
               </div>
             </div>
 
+            {/* Passwort-Wiederholung zur Sicherheit */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Bestätigen</label>
               <div className="relative group">
@@ -99,6 +118,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
               </div>
             </div>
 
+            {/* Fehlermeldungen anzeigen */}
             {error && (
               <div className="bg-red-50 text-red-600 text-xs font-bold p-4 rounded-xl border border-red-100 flex items-center gap-3">
                 <ShieldAlert size={18} />

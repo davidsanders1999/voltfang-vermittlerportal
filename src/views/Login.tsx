@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { Mail, Lock, Loader2, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 
+/**
+ * Props für die Login-Komponente
+ * @property onLoginSuccess - Callback bei erfolgreichem Login
+ * @property onGoToRegister - Callback zum Wechseln zur Registrierung
+ * @property onForgotPassword - Callback zum Wechseln zur "Passwort vergessen" Ansicht
+ */
 interface LoginProps {
   onLoginSuccess: () => void;
   onGoToRegister: () => void;
@@ -14,6 +20,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Führt den Login-Versuch über Supabase Auth aus
+   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -26,8 +35,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
       });
 
       if (error) throw error;
+      
+      // Bei Erfolg die App-Zustandsänderung auslösen
       onLoginSuccess();
     } catch (err: any) {
+      // Fehlermeldung für den User aufbereiten
       setError(err.message || 'Login fehlgeschlagen. Bitte prüfen Sie Ihre Daten.');
     } finally {
       setLoading(false);
@@ -37,15 +49,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
   return (
     <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Logo/Header */}
+        {/* Titel & Subtitel */}
         <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight mb-2">Willkommen zurück</h1>
           <p className="text-slate-500 text-sm">Voltfang Vermittler Portal</p>
         </div>
 
-        {/* Login Card */}
+        {/* Login Karte */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 p-8 md:p-10 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
           <form onSubmit={handleLogin} className="space-y-6">
+            {/* E-Mail Eingabe */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">E-Mail Adresse</label>
               <div className="relative group">
@@ -63,6 +76,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
               </div>
             </div>
 
+            {/* Passwort Eingabe */}
             <div className="space-y-2">
               <div className="flex justify-between items-center px-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Passwort</label>
@@ -89,6 +103,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
               </div>
             </div>
 
+            {/* Fehlermeldung bei falschem Login */}
             {error && (
               <div className="bg-red-50 text-red-600 text-xs font-bold p-4 rounded-xl border border-red-100 flex items-center gap-3 animate-in shake duration-500">
                 <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center shrink-0">
@@ -98,6 +113,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
               </div>
             )}
 
+            {/* Login Button */}
             <button
               type="submit"
               disabled={loading}
@@ -113,6 +129,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
             </button>
           </form>
 
+          {/* Partner werden Bereich */}
           <div className="mt-8 flex flex-col gap-4">
             <button 
               onClick={onGoToRegister}
@@ -122,6 +139,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
             </button>
           </div>
 
+          {/* Footer Infos */}
           <div className="mt-10 pt-8 border-t border-slate-50 flex flex-col items-center gap-4">
             <div className="flex items-center gap-2 text-slate-400">
               <ShieldCheck size={16} />

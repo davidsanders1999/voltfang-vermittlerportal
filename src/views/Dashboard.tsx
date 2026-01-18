@@ -5,16 +5,16 @@ import {
   Zap, 
   CheckCircle2, 
   Clock, 
-  ArrowUpRight,
-  ArrowDownRight,
-  ChevronRight,
-  Briefcase,
-  Users,
-  Target,
-  Calendar,
-  Filter,
-  ArrowRight,
-  Loader2
+  ArrowUpRight, 
+  ArrowDownRight, 
+  ChevronRight, 
+  Briefcase, 
+  Users, 
+  Target, 
+  Calendar, 
+  Filter, 
+  ArrowRight, 
+  Loader2 
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -23,11 +23,18 @@ import {
   XAxis, 
   YAxis, 
   Tooltip, 
-  CartesianGrid
+  CartesianGrid 
 } from 'recharts';
 import { ViewType, Project, User, UserCompany } from '../types';
 import { StatusBadge } from './projekte/ProjekteShared';
 
+/**
+ * Schnittstelle für die Dashboard-Props
+ * @property onNavigate - Callback zum Wechseln der Hauptansicht
+ * @property onNavigateToProject - Callback zum Springen in ein spezifisches Projekt
+ * @property userProfile - Das Profil des aktuell eingeloggten Nutzers
+ * @property userCompany - Die Unternehmensdaten des Nutzers
+ */
 interface DashboardProps {
   onNavigate: (view: ViewType) => void;
   onNavigateToProject: (projectId: string) => void;
@@ -35,6 +42,9 @@ interface DashboardProps {
   userCompany: UserCompany | null;
 }
 
+/**
+ * Kleine wiederverwendbare Karte für KPI-Kennzahlen
+ */
 const KPICard = ({ title, value, change, isPositive, icon }: any) => (
   <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
     <div className="flex justify-between items-start mb-3">
@@ -64,19 +74,22 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   
+  /**
+   * Formatiert Zahlen in Währungsstrings (z.B. 1.5 Mio. € oder 1.234 €)
+   */
   const formatCurrency = (value: number) => {
     if (!value || value === 0) return '- €';
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)} Mio. €`;
     return `${value.toLocaleString('de-DE')} €`;
   };
 
+  // Lädt alle Projekte des Unternehmens aus Supabase
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!userProfile?.company_id) return;
       
       setLoading(true);
       try {
-        // Hole Projekte des aktuellen Partners
         const { data: projectsData, error: projectsError } = await supabase
           .from('project')
           .select('*')
@@ -96,6 +109,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     fetchDashboardData();
   }, [userProfile]);
 
+  /**
+   * Berechnet die Daten für den monatlichen Umsatzverlauf (BarChart)
+   * Berücksichtigt nur gewonnene Projekte im ausgewählten Jahr.
+   */
   const revenueTrendData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
     const data = months.map(m => ({ month: m, rev: 0 }));
@@ -116,6 +133,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     return data;
   }, [projects, selectedYear]);
 
+  /**
+   * Berechnet die Verteilung der Projekte über die Pipeline-Phasen (Funnel)
+   */
   const funnelData = useMemo(() => {
     const statusCounts = projects.reduce((acc, p) => {
       acc[p.status] = (acc[p.status] || 0) + 1;
@@ -132,23 +152,30 @@ const Dashboard: React.FC<DashboardProps> = ({
     ];
   }, [projects]);
 
+  /**
+   * Berechnet globale Statistiken (KPIs) basierend auf dem Projektstand
+   */
   const stats = useMemo(() => {
     const wonCount = projects.filter(p => p.status === 'Gewonnen').length;
     const lostCount = projects.filter(p => p.status === 'Verloren').length;
     const totalFinished = wonCount + lostCount;
     
+    // Abschlussquote (Gewonnen vs. Verloren)
     const closingRate = totalFinished > 0 
       ? ((wonCount / totalFinished) * 100).toFixed(1) + '%' 
       : '-%';
 
+    // Wert aller Projekte, die noch in Verhandlung sind
     const pipelineValue = projects
       .filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren')
       .reduce((sum, p) => sum + (p.volume || 0), 0);
 
+    // Volumen im aktuellen Kalenderjahr
     const volumeCurrentYear = projects
       .filter(p => new Date(p.created_at).getFullYear() === currentYear)
       .reduce((sum, p) => sum + (p.volume || 0), 0);
 
+    // Vergleich zum Vorjahr für den Trend-Indikator
     const volumePrevYear = projects
       .filter(p => new Date(p.created_at).getFullYear() === currentYear - 1)
       .reduce((sum, p) => sum + (p.volume || 0), 0);
@@ -159,6 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     
     const isVolumePositive = volumeCurrentYear >= volumePrevYear;
 
+    // Durchschnittlicher Wert pro Deal (ohne verlorene)
     const projectsWithVolume = projects.filter(p => p.volume && p.status !== 'Verloren');
     const avgDealValue = projectsWithVolume.length > 0 
       ? projectsWithVolume.reduce((sum, p) => sum + (p.volume || 0), 0) / projectsWithVolume.length 
@@ -175,6 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [projects, currentYear]);
 
+  // Ladezustand anzeigen, wenn noch keine Daten da sind
   if (loading && projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -186,13 +215,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+      {/* Willkommens-Bereich */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Willkommen zurück, {userProfile?.fname}!</h2>
           <p className="text-sm text-slate-500">Performance-Übersicht für {userCompany?.name}</p>
         </div>
       </div>
 
+      {/* KPI-Grid (4 Spalten) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard 
           title="Aktive Projekte" 
@@ -218,10 +249,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         />
       </div>
 
+      {/* Hauptgrafiken */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+        {/* Linke Seite: Monatlicher Umsatzverlauf */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Umsatzverlauf Monatlich</h3>
+            {/* Jahresfilter */}
             <div className="relative">
               <select 
                 value={selectedYear}
@@ -235,6 +269,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={12} />
             </div>
           </div>
+          {/* Chart-Container */}
           <div className="h-[400px] w-full mt-auto">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -284,7 +319,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+        {/* Rechte Seite: Pipeline Funnel & Abschlussquote */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Pipeline Funnel</h3>
           <div className="flex-1 space-y-4">
             {funnelData.map((item: any, i: number) => {
@@ -335,7 +371,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      {/* Sektion: Neueste Projekte (Kurzübersicht) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
         <div className="p-5 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ihre neuesten Projekte</h3>
           <button 

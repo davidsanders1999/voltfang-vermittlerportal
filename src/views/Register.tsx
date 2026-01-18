@@ -10,23 +10,32 @@ import {
   Phone, 
   Globe, 
   MapPin,
-  ArrowLeft,
-  ArrowRight,
+  ArrowLeft, 
+  ArrowRight, 
   CheckCircle2
 } from 'lucide-react';
 
+/**
+ * Props für die Register-Komponente
+ * @property onBackToLogin - Funktion, um zurück zum Login zu springen
+ * @property onRegisterSuccess - Callback bei erfolgreicher Registrierung (wird hier intern durch Mail-Hinweis ersetzt)
+ */
 interface RegisterProps {
   onBackToLogin: () => void;
   onRegisterSuccess: () => void;
 }
 
+/**
+ * Multi-Step-Registrierungsformular für neue Partner
+ */
 const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess }) => {
+  // Step 1: Persönliche Daten, Step 2: Unternehmensname, Step 3: Anschrift
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Form State
+  // Zentraler Form-State für alle Schritte
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -41,18 +50,25 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
     country: 'Deutschland'
   });
 
+  /**
+   * Generische Change-Handler für alle Input-Felder
+   */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  /**
+   * Führt die eigentliche Registrierung durch.
+   * Nutzt Supabase Auth für den User und eine Datenbank-Funktion (RPC) für Company + Profil.
+   */
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Supabase Auth Registration
+      // 1. Supabase Auth Registrierung (erstellt den Account)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -61,7 +77,8 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
       if (authError) throw authError;
       if (!authData.user) throw new Error('Registrierung fehlgeschlagen.');
 
-      // 2. Datenbank-Funktion aufrufen (erstellt Company + User Profil in einer Transaktion)
+      // 2. Datenbank-Funktion 'handle_new_partner_registration' aufrufen.
+      // Diese erstellt gleichzeitig das Unternehmen und verknüpft das User-Profil.
       const { error: rpcError } = await supabase.rpc('handle_new_partner_registration', {
         p_auth_id: authData.user.id,
         p_fname: formData.fname,
@@ -78,6 +95,7 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
 
       if (rpcError) throw rpcError;
 
+      // Erfolgsstatus setzen, um die Bestätigungsseite anzuzeigen
       setIsSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Registrierung fehlgeschlagen.');
@@ -87,6 +105,7 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
     }
   };
 
+  // Render: Erfolgsseite (nach Klick auf Registrieren)
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4">
@@ -113,16 +132,16 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
   return (
     <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4 py-12">
       <div className="max-w-2xl w-full">
-        {/* Header */}
+        {/* Header-Infos */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight mb-1">Partner werden</h1>
           <p className="text-slate-500 text-sm">Erstellen Sie Ihr Konto für das Vermittler Portal</p>
         </div>
 
-        {/* Register Card */}
+        {/* Registrierungskarte mit Steps */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
           <div className="p-8 md:p-10">
-            {/* Progress Bar */}
+            {/* Progress-Balken oben */}
             <div className="flex gap-2 mb-10">
               {[1, 2, 3].map(i => (
                 <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= i ? 'bg-[#82a8a4]' : 'bg-slate-100'}`} />
@@ -130,6 +149,8 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
             </div>
 
             <form onSubmit={step === 3 ? handleRegister : (e) => { e.preventDefault(); setStep(s => s + 1); }} className="space-y-6">
+              
+              {/* SCHRITT 1: PERSÖNLICHE DATEN & LOGIN */}
               {step === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="grid grid-cols-2 gap-4">
@@ -172,6 +193,7 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
                 </div>
               )}
 
+              {/* SCHRITT 2: UNTERNEHMENS-INFORMATIONEN */}
               {step === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="space-y-2">
@@ -191,6 +213,7 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
                 </div>
               )}
 
+              {/* SCHRITT 3: STANDORT / ANSCHRIFT */}
               {step === 3 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="space-y-2">
@@ -217,12 +240,14 @@ const Register: React.FC<RegisterProps> = ({ onBackToLogin, onRegisterSuccess })
                 </div>
               )}
 
+              {/* Fehlermeldung bei Registrierung */}
               {error && (
                 <div className="bg-red-50 text-red-600 text-xs font-bold p-4 rounded-xl border border-red-100">
                   {error}
                 </div>
               )}
 
+              {/* Navigation-Buttons am Ende der Form */}
               <div className="flex justify-between items-center pt-4">
                 {step > 1 ? (
                   <button type="button" onClick={() => setStep(s => s - 1)} className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">

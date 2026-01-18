@@ -2,6 +2,9 @@ import React from 'react';
 import { ProjectStatus } from '../../types';
 import { CheckCircle2, XCircle, Crown } from 'lucide-react';
 
+/**
+ * Liste aller möglichen Projekt-Status in der korrekten Reihenfolge
+ */
 export const ALL_PROJECT_STATUSES: ProjectStatus[] = [
   'Lead übergeben',
   'Technische Klärung',
@@ -11,8 +14,14 @@ export const ALL_PROJECT_STATUSES: ProjectStatus[] = [
   'Verloren',
 ];
 
+/**
+ * Phasen, die im Standard-Pipeline-Visualizer (oben auf der Detailseite) angezeigt werden
+ */
 export const PIPELINE_PHASES = ALL_PROJECT_STATUSES.slice(0, 5);
 
+/**
+ * Tailwind-Klassen für die farbliche Gestaltung der Status-Badges
+ */
 export const STATUS_STYLES: Record<ProjectStatus, string> = {
   'Gewonnen': 'bg-green-100 text-green-700 border-green-200',
   'Verloren': 'bg-red-100 text-red-700 border-red-200',
@@ -22,6 +31,12 @@ export const STATUS_STYLES: Record<ProjectStatus, string> = {
   'Lead übergeben': 'bg-slate-100 text-slate-700 border-slate-200',
 };
 
+/**
+ * Wiederverwendbare Badge-Komponente für den Projektstatus
+ * @property status - Der aktuelle Status des Projekts
+ * @property active - Falls false, wird die Badge ausgegraut (für Filter)
+ * @property onClick - Optionaler Klick-Handler
+ */
 export const StatusBadge: React.FC<{ 
   status: ProjectStatus; 
   active?: boolean; 
@@ -43,16 +58,25 @@ export const StatusBadge: React.FC<{
   );
 };
 
+/**
+ * Visualisiert den Fortschritt eines Projekts als horizontale Stepper-Leiste
+ * @property status - Der aktuelle Status des Projekts
+ */
 export const PipelineVisualizer = ({ status }: { status: ProjectStatus }) => {
   const isLost = status === 'Verloren';
   const isWon = status === 'Gewonnen';
+  
+  // Wenn verloren, zeigen wir 'Verloren' als letzten Schritt an, sonst die normalen Phasen
   const phases = isLost ? [...PIPELINE_PHASES.slice(0, 4), 'Verloren'] : PIPELINE_PHASES;
   const currentIndex = phases.indexOf(status);
 
   return (
     <div className="w-full py-4">
       <div className="flex items-center justify-between w-full relative">
+        {/* Hintergrund-Linie */}
         <div className="absolute top-5 left-0 w-full h-0.5 bg-slate-100 -z-0"></div>
+        
+        {/* Einzelne Phasen-Icons */}
         {phases.map((phase, idx) => {
           const isCompleted = idx < currentIndex;
           const isActive = idx === currentIndex;
@@ -67,10 +91,13 @@ export const PipelineVisualizer = ({ status }: { status: ProjectStatus }) => {
                   isCompleted ? 'bg-slate-800 border-slate-800 text-white' : 
                   'bg-white border-slate-200 text-slate-300'}
               `} style={{ transitionDelay: `${idx * 150}ms` }}>
+                {/* Symbol-Logik: Krone für gewonnen, Haken für erledigt, X für verloren, sonst Nummer */}
                 {isPhaseWon ? <Crown size={20} fill="currentColor" /> : 
                  isCompleted ? <CheckCircle2 size={18} /> : 
                  (phase === 'Verloren' ? <XCircle size={18} /> : <span className="text-xs font-bold">{idx + 1}</span>)}
               </div>
+              
+              {/* Phasen-Beschriftung */}
               <p className={`
                 mt-3 text-[9px] font-bold uppercase tracking-tight text-center px-2 transition-colors duration-500
                 ${isPhaseWon ? 'text-yellow-600' : 

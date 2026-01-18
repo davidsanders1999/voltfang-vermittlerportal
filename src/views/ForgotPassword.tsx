@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { Mail, Loader2, ArrowLeft, Send, ShieldCheck } from 'lucide-react';
 
+/**
+ * Props für die ForgotPassword-Komponente
+ * @property onBackToLogin - Funktion, um zurück zur Login-Ansicht zu springen
+ */
 interface ForgotPasswordProps {
   onBackToLogin: () => void;
 }
@@ -12,12 +16,17 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  /**
+   * Sendet die Passwort-Reset-E-Mail über Supabase Auth
+   */
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      // Supabase sendet den Reset-Link an die angegebene E-Mail
+      // Die redirectTo-URL führt den User nach Klick in der Mail zur Passwort-Vergabe Seite
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -31,6 +40,7 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin }) => {
     }
   };
 
+  // Erfolgsmeldung anzeigen, wenn die Mail verschickt wurde
   if (success) {
     return (
       <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4">
@@ -56,11 +66,13 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin }) => {
   return (
     <div className="min-h-screen bg-[#f8fafb] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
+        {/* Header */}
         <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight mb-2">Passwort vergessen?</h1>
           <p className="text-slate-500 text-sm">Geben Sie Ihre E-Mail ein, um einen Reset-Link zu erhalten.</p>
         </div>
 
+        {/* Formular-Karte */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 p-8 md:p-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <form onSubmit={handleResetRequest} className="space-y-6">
             <div className="space-y-2">
@@ -80,12 +92,14 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin }) => {
               </div>
             </div>
 
+            {/* Fehlermeldung */}
             {error && (
               <div className="bg-red-50 text-red-600 text-xs font-bold p-4 rounded-xl border border-red-100">
                 {error}
               </div>
             )}
 
+            {/* Buttons */}
             <button
               type="submit"
               disabled={loading}

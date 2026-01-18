@@ -5,17 +5,35 @@ import ProjektUeberblick from './projekte/ProjektUeberblick';
 import ProjektFormular from './projekte/ProjektFormular';
 import ProjektDetail from './projekte/ProjektDetail';
 
+/**
+ * Schnittstelle für die Projekte-Komponente
+ * @property initialProjectId - Optionale ID eines Projekts, das direkt beim Laden angezeigt werden soll
+ * @property userProfile - Das Profil des aktuell eingeloggten Nutzers
+ */
 interface ProjekteProps {
   initialProjectId?: string | null;
   userProfile: User | null;
 }
 
+/**
+ * Haupt-Container für die Projekt-Verwaltung. 
+ * Steuert die Navigation zwischen Liste, Detail-Ansicht und Formular.
+ */
 const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) => {
+  // Zentraler State für die Projekte-Liste
   const [projects, setProjects] = useState<Project[]>([]);
+  
+  // Navigation State: Welches Projekt wird gerade im Detail angesehen?
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  
+  // Navigation State: Wird das Formular zum Erstellen gerade angezeigt?
   const [showForm, setShowForm] = useState(false);
+  
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Lädt alle Projekte des Unternehmens aus der Supabase 'project' Tabelle
+   */
   const fetchProjects = async () => {
     if (!userProfile?.company_id) return;
     
@@ -30,13 +48,13 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
       if (error) throw error;
       setProjects(data || []);
       
-      // Falls eine initialProjectId übergeben wurde, das entsprechende Projekt selektieren
+      // Logik für Deep-Linking (falls initialProjectId vorhanden)
       if (initialProjectId && data) {
         const project = data.find(p => p.id === initialProjectId);
-      if (project) {
-        setSelectedProject(project);
+        if (project) {
+          setSelectedProject(project);
+        }
       }
-    }
     } catch (error) {
       console.error('Fehler beim Laden der Projekte:', error);
     } finally {
@@ -44,10 +62,12 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
     }
   };
 
+  // Projekte laden, sobald die Komponente gemountet wird
   useEffect(() => {
     fetchProjects();
   }, [initialProjectId]);
 
+  // Ladeanzeige
   if (loading && projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -57,6 +77,7 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
     );
   }
 
+  // Bedingtes Rendering: Formular anzeigen
   if (showForm) {
     return (
       <ProjektFormular 
@@ -64,12 +85,13 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
         onBack={() => setShowForm(false)} 
         onSubmit={() => {
           setShowForm(false);
-          fetchProjects();
+          fetchProjects(); // Nach erfolgreichem Erstellen Liste neu laden
         }} 
       />
     );
   }
 
+  // Bedingtes Rendering: Detailansicht anzeigen
   if (selectedProject) {
     return (
       <ProjektDetail 
@@ -79,6 +101,7 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
     );
   }
 
+  // Standard: Projekt-Überblick (Liste) anzeigen
   return (
     <ProjektUeberblick 
       projects={projects}

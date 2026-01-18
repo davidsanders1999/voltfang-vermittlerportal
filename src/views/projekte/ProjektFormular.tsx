@@ -18,17 +18,27 @@ import {
 } from 'lucide-react';
 import { EstimatedCapacity } from '../../types';
 
+/**
+ * Props für das ProjektFormular
+ * @property onBack - Zurück zur Liste ohne Speichern
+ * @property onSubmit - Callback nach erfolgreichem Erstellen
+ * @property userCompanyId - Die ID des Unternehmens, dem das Projekt zugeordnet wird
+ */
 interface ProjektFormularProps {
   onBack: () => void;
   onSubmit: () => void;
   userCompanyId: string | null;
 }
 
+/**
+ * Multi-Step Formular zum Erstellen eines neuen Projekts (Leads)
+ */
 const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, userCompanyId }) => {
+  // Steuert, welcher der 3 Schritte gerade angezeigt wird
   const [formStep, setFormStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
-  // Form State
+  // Zentraler State für alle Formularfelder
   const [formData, setFormData] = useState({
     name: '',
     company_name: '',
@@ -45,24 +55,31 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
     location_country: 'Deutschland'
   });
 
+  /**
+   * Generische Change-Handler Funktion für Inputs und Selects
+   */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  /**
+   * Speichert das neue Projekt in der Supabase 'project' Tabelle
+   */
   const handleCreateProject = async () => {
     setLoading(true);
     try {
-      
       const { error } = await supabase
         .from('project')
         .insert([{
           ...formData,
-          status: 'Lead übergeben', // Standardstatus für neue Projekte
+          status: 'Lead übergeben', // Jedes neue Projekt startet in dieser Phase
           company_id: userCompanyId,
         }]);
 
       if (error) throw error;
+      
+      // Callback aufrufen, um zur Liste zurückzukehren
       onSubmit();
     } catch (error) {
       console.error('Fehler beim Erstellen des Projekts:', error);
@@ -74,6 +91,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      {/* Header mit Zurück-Button und Fortschrittsanzeige */}
       <div className="flex items-center justify-between">
         <button 
           onClick={onBack}
@@ -89,6 +107,8 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
       </div>
 
       <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 md:p-12 overflow-hidden">
+        
+        {/* SCHRITT 1: BASIS-INFOS */}
         {formStep === 1 && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="text-center">
@@ -142,6 +162,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
           </div>
         )}
 
+        {/* SCHRITT 2: PLANUNG & EXTERNER KONTAKT */}
         {formStep === 2 && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="text-center">
@@ -180,6 +201,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
                   </select>
                 </div>
               </div>
+              {/* Kontaktperson des Kunden */}
               <div className="space-y-2 mt-4 pt-4 border-t border-slate-50">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vorname</label>
                 <div className="relative">
@@ -240,6 +262,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
           </div>
         )}
 
+        {/* SCHRITT 3: STANDORT-DETAILS (Wichtig für Maps) */}
         {formStep === 3 && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="text-center">
@@ -301,6 +324,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
           </div>
         )}
 
+        {/* Footer Navigation im Formular */}
         <div className="flex justify-between mt-12 pt-8 border-t border-slate-50">
           <button 
             onClick={() => setFormStep(s => Math.max(1, s - 1))}
@@ -309,6 +333,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
           >
             Zurück
           </button>
+          
           {formStep < 3 ? (
             <button 
               onClick={() => setFormStep(s => s + 1)}

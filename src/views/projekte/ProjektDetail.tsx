@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import confetti from 'canvas-confetti';
 import { 
   ChevronLeft, 
   Building, 
@@ -15,12 +16,66 @@ import {
 import { Project } from '../../types';
 import { StatusBadge, PipelineVisualizer } from './ProjekteShared';
 
+/**
+ * Props für die ProjektDetail-Komponente
+ * @property project - Das anzuzeigende Projekt-Objekt
+ * @property onBack - Callback-Funktion, um zur Übersicht zurückzukehren
+ */
 interface ProjektDetailProps {
   project: Project;
   onBack: () => void;
 }
 
 const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
+  
+  // Effekt für die Konfetti-Animation bei gewonnenen Projekten
+  useEffect(() => {
+    // Nur auslösen, wenn das Projekt den Status 'Gewonnen' hat
+    if (project.status === 'Gewonnen') {
+      const duration = 3 * 1000; // 3 Sekunden Animationsdauer
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+      // Hilfsfunktion für zufällige Zahlen in einem Bereich
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+      // Intervall startet alle 250ms neue Konfetti-Explosionen
+      const interval: any = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        // Wenn Zeit abgelaufen, Intervall stoppen
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        // Partikelanzahl nimmt über die Zeit ab
+        const particleCount = 50 * (timeLeft / duration);
+        
+        // Konfetti von der linken Seite
+        confetti({ 
+          ...defaults, 
+          particleCount, 
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+          colors: ['#82a8a4', '#fbbf24', '#ffffff'] // Voltfang-Farben
+        });
+        
+        // Konfetti von der rechten Seite
+        confetti({ 
+          ...defaults, 
+          particleCount, 
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+          colors: ['#82a8a4', '#fbbf24', '#ffffff']
+        });
+      }, 250);
+
+      // Cleanup: Intervall löschen, wenn Komponente unmountet
+      return () => clearInterval(interval);
+    }
+  }, [project.id, project.status]); // Reagiert auf ID oder Status-Änderung
+
+  /**
+   * Hilfsfunktion zur Formatierung von Datums-Strings ins deutsche Format
+   */
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'noch offen';
     return new Date(dateString).toLocaleDateString('de-DE', {
@@ -32,6 +87,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pb-12">
+      {/* Zurück-Button */}
       <button 
         onClick={onBack}
         className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
@@ -39,10 +95,11 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
         <ChevronLeft size={16} /> Zurück zur Übersicht
       </button>
 
-      {/* --- HEADER CARD --- */}
+      {/* --- HEADER KARTE --- */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/50">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            {/* Projekt-Name und Basis-Infos */}
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 bg-[#82a8a4]/10 rounded-2xl flex items-center justify-center text-[#82a8a4]">
                  <Building size={28} strokeWidth={1.5} />
@@ -57,10 +114,10 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                      <Navigation size={12} className="text-[#82a8a4]" />
                      {project.location_city}, {project.location_country}
                    </div>
-
                 </div>
               </div>
             </div>
+            {/* Bearbeiten-Button (Platzhalter) */}
             <div className="flex gap-2">
               <button 
                 className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-[#82a8a4] hover:border-[#82a8a4] transition-all active:scale-90"
@@ -72,7 +129,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
           </div>
         </div>
 
-        {/* --- PIPELINE SECTION --- */}
+        {/* --- PIPELINE ABSCHNITT (Visualisierung des Fortschritts) --- */}
         <div className="px-8 py-8 bg-slate-50/30 border-b border-slate-100">
            <div className="max-w-4xl mx-auto">
              <div className="flex justify-between items-center mb-6 px-4">
@@ -82,11 +139,13 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
            </div>
         </div>
 
+        {/* --- HAUPTINHALT (Zwei-Spalten-Layout) --- */}
         <div className="p-10 bg-white">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-12">
             
-            {/* --- LEFT COLUMN: COMPANY & CONTACT --- */}
+            {/* --- LINKE SPALTE: UNTERNEHMEN & KONTAKT --- */}
             <div className="space-y-10">
+              {/* Unternehmensinfo */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -105,6 +164,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                 </div>
               </section>
 
+              {/* Externer Ansprechpartner (Kunde) */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -131,6 +191,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                 </div>
               </section>
 
+              {/* Voltfang interner Ansprechpartner */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -149,8 +210,9 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
               </section>
             </div>
 
-            {/* --- RIGHT COLUMN: PLANNING & LOCATION --- */}
+            {/* --- RECHTE SPALTE: PLANUNG & STANDORT --- */}
             <div className="space-y-10">
+              {/* Projektplanung (Daten & Volumen) */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -180,6 +242,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                 </div>
               </section>
 
+              {/* Standortdetails */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -203,7 +266,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
         </div>
       </div>
 
-      {/* --- MAP SECTION --- */}
+      {/* --- KARTEN ABSCHNITT (Google Maps Integration) --- */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/20">
           <div className="flex items-center gap-3">
@@ -212,11 +275,13 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
             </div>
             <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Kartenansicht & Umgebung</h3>
           </div>
+          {/* Externer Link zu Google Maps */}
           <button className="px-4 py-2 text-[9px] font-bold text-[#82a8a4] uppercase bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2">
             <ExternalLink size={10} /> Google Maps
           </button>
         </div>
         <div className="relative h-[400px] w-full group">
+            {/* Einbettung der Karte via iFrame basierend auf den Adressdaten */}
             <iframe
               width="100%"
               height="100%"

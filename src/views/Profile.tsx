@@ -13,24 +13,37 @@ import {
 } from 'lucide-react';
 import { User, UserCompany } from '../types';
 
+/**
+ * Profil-Ansicht zum Anzeigen und Bearbeiten der Nutzer- und Unternehmensdaten
+ */
 const Profile: React.FC = () => {
+  // Lokaler State für Profil, Unternehmen und Status-Flags
   const [profile, setProfile] = useState<User | null>(null);
   const [company, setCompany] = useState<UserCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // State für die bearbeitbaren Felder
   const [editedProfile, setEditedProfile] = useState<Partial<User>>({});
   const [editedCompany, setEditedCompany] = useState<Partial<UserCompany>>({});
+  
+  // Feedback-State (Error/Success)
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  /**
+   * Lädt die aktuellen Profil- und Unternehmensdaten aus Supabase
+   */
   const fetchProfileData = async () => {
     setLoading(true);
     try {
+      // 1. Auth-Daten holen
       const { data: { user: authUser } } = await supabase.auth.getUser();
       
       if (!authUser) return;
 
+      // 2. Nutzer-Profil aus der 'user' Tabelle laden
       const { data: userData, error: userError } = await supabase
         .from('user')
         .select('*')
@@ -41,10 +54,11 @@ const Profile: React.FC = () => {
       
       const extendedProfile = {
         ...userData,
-        email: authUser.email
+        email: authUser.email // E-Mail kommt aus dem Auth-System
       };
       setProfile(extendedProfile);
 
+      // 3. Zugehörige Unternehmensdaten laden
       if (userData.company_id) {
         const { data: companyData, error: companyError } = await supabase
           .from('usercompany')
@@ -63,10 +77,14 @@ const Profile: React.FC = () => {
     }
   };
 
+  // Daten beim ersten Laden der Komponente abrufen
   useEffect(() => {
     fetchProfileData();
   }, []);
 
+  /**
+   * Aktiviert den Bearbeitungsmodus und befüllt die temporären Felder
+   */
   const handleStartEditing = () => {
     if (profile) {
       setEditedProfile({
@@ -90,13 +108,16 @@ const Profile: React.FC = () => {
     setSuccess(false);
   };
 
+  /**
+   * Speichert die Änderungen in beiden Tabellen (User & UserCompany)
+   */
   const handleSave = async () => {
     if (!profile) return;
     
     setSaving(true);
     setError(null);
     try {
-      // 1. Update User Profile
+      // 1. Update des User-Profils
       const { error: userUpdateError } = await supabase
         .from('user')
         .update({
@@ -108,7 +129,7 @@ const Profile: React.FC = () => {
 
       if (userUpdateError) throw userUpdateError;
 
-      // 2. Update Company if it exists
+      // 2. Update des Unternehmens (falls vorhanden)
       if (company && company.id) {
         const { error: companyUpdateError } = await supabase
           .from('usercompany')
@@ -125,9 +146,12 @@ const Profile: React.FC = () => {
         if (companyUpdateError) throw companyUpdateError;
       }
 
+      // Daten neu laden, um die Ansicht zu aktualisieren
       await fetchProfileData();
       setIsEditing(false);
       setSuccess(true);
+      
+      // Erfolgsmeldung nach 3 Sek ausblenden
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       console.error('Fehler beim Speichern:', err);
@@ -137,6 +161,7 @@ const Profile: React.FC = () => {
     }
   };
 
+  // Ladeanzeige
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -146,6 +171,7 @@ const Profile: React.FC = () => {
     );
   }
 
+  // Fehlerfall
   if (!profile) {
     return (
       <div className="text-center py-20 bg-white rounded-3xl border border-slate-100">
@@ -156,7 +182,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-12">
-      {/* Status Messages */}
+      {/* Status-Meldungen */}
       {success && (
         <div className="bg-green-50 border border-green-100 text-green-600 px-6 py-4 rounded-2xl text-xs font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
           <ShieldCheck size={18} /> Profil erfolgreich aktualisiert!
@@ -168,7 +194,7 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* Header Card */}
+      {/* --- HEADER KARTE: Name & Profilbild-Platzhalter --- */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-8 bg-gradient-to-r from-white to-slate-50/50">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -191,6 +217,7 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             </div>
+            {/* Action Buttons im Header */}
             {isEditing ? (
               <div className="flex gap-3">
                 <button
@@ -220,8 +247,10 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
+      {/* --- DETAIL INFORMATIONEN (Zwei Spalten) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Unternehmensinformationen */}
+        
+        {/* UNTERNEHMENSINFORMATIONEN */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 space-y-8">
           <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
             <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -322,7 +351,7 @@ const Profile: React.FC = () => {
           )}
         </div>
 
-        {/* Persönliche Informationen */}
+        {/* PERSÖNLICHE INFORMATIONEN */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 space-y-8">
           <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
             <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-[#82a8a4]">
@@ -383,7 +412,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Account Status / Meta Info */}
+      {/* Meta Infos am Seitenende */}
       <div className="bg-slate-50 rounded-2xl p-6 flex flex-wrap gap-8 justify-between items-center">
         <div className="flex items-center gap-4">
            <div className="text-right">
@@ -398,7 +427,6 @@ const Profile: React.FC = () => {
              <p className="text-xs font-bold text-green-600">Aktiv</p>
            </div>
         </div>
-
       </div>
     </div>
   );

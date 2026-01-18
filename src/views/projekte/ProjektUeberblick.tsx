@@ -3,20 +3,35 @@ import { Search, Filter, Plus, X } from 'lucide-react';
 import { Project, ProjectStatus } from '../../types';
 import { StatusBadge, ALL_PROJECT_STATUSES } from './ProjekteShared';
 
+/**
+ * Props für den ProjektUeberblick
+ * @property projects - Liste aller anzuzeigenden Projekte
+ * @property onSelectProject - Callback, wenn ein Projekt zur Detailansicht angeklickt wird
+ * @property onCreateProject - Callback zum Öffnen des "Neu anlegen" Formulars
+ */
 interface ProjektUeberblickProps {
   projects: Project[];
   onSelectProject: (project: Project) => void;
   onCreateProject: () => void;
 }
 
+/**
+ * Tabellarische Übersicht aller Projekte mit Such- und Filterfunktionen.
+ */
 const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({ 
   projects, 
   onSelectProject, 
   onCreateProject 
 }) => {
+  // State für die Textsuche
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State für die Multi-Status-Filterung
   const [selectedStatuses, setSelectedStatuses] = useState<ProjectStatus[]>([]);
 
+  /**
+   * Fügt einen Status zum Filter hinzu oder entfernt ihn (Toggle-Logik)
+   */
   const toggleStatus = (status: ProjectStatus) => {
     setSelectedStatuses(prev => 
       prev.includes(status) 
@@ -25,13 +40,19 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
     );
   };
 
+  /**
+   * Berechnet die gefilterte Liste basierend auf Suche und Status-Auswahl.
+   * Nutzt useMemo für bessere Performance bei großen Listen.
+   */
   const filteredProjects = useMemo(() => {
     return projects.filter(project => {
+      // Suche über Name, Kunde und Stadt
       const matchesSearch = 
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.location_city.toLowerCase().includes(searchTerm.toLowerCase());
       
+      // Filtern nach Status (falls Filter aktiv sind)
       const matchesStatus = 
         selectedStatuses.length === 0 || 
         selectedStatuses.includes(project.status);
@@ -40,6 +61,9 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
     });
   }, [projects, searchTerm, selectedStatuses]);
 
+  /**
+   * Datum-Formatierung für die Tabellen-Anzeige
+   */
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('de-DE', {
       day: '2-digit',
@@ -50,6 +74,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Header Bereich */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 tracking-tight">Projekte</h2>
@@ -63,8 +88,10 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
         </button>
       </div>
 
+      {/* Such- und Filter-Leiste */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
         <div className="flex flex-wrap gap-3 items-center">
+          {/* Suchfeld mit Icon */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
             <input 
@@ -75,6 +102,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-medium focus:outline-none focus:border-[#82a8a4] transition-all"
             />
           </div>
+          {/* Filter zurücksetzen Button (nur sichtbar wenn Filter aktiv) */}
           {selectedStatuses.length > 0 && (
             <button 
               onClick={() => setSelectedStatuses([])}
@@ -85,6 +113,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
           )}
         </div>
         
+        {/* Status Filter Badges */}
         <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-slate-50">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 flex items-center gap-1">
             <Filter size={10} /> Status Filter:
@@ -102,6 +131,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
         </div>
       </div>
 
+      {/* Haupt-Tabelle */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
