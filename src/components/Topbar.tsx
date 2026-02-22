@@ -61,6 +61,7 @@ const Topbar: React.FC<TopbarProps> = ({ currentView, onSidebarToggle, onNavigat
         {/* Profile Action */}
         <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label="Benutzerprofil öffnen"
           className="flex items-center gap-2 group p-1.5 hover:bg-slate-50 rounded-xl transition-all"
         >
           <div className="hidden text-right lg:block">

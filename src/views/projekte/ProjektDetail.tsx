@@ -229,16 +229,17 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Vorauss. Bestelldatum</span>
                     <p className="text-xs font-bold text-slate-800">{formatDate(project.estimated_order_date)}</p>
                   </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Kapazität</span>
-                      <p className="text-xs font-bold text-slate-800">{project.estimated_capacity || 'Keine Angabe'}</p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Auftragsvolumen</span>
-                      <p className="text-xs font-bold text-slate-800">
-                        {project.volume ? `${project.volume.toLocaleString('de-DE')} €` : 'Kein Angebot gesendet'}
-                      </p>
-                    </div>
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Kapazität</span>
+                    <p className="text-xs font-bold text-slate-800">
+                      {project.offered_capacity 
+                        ? `${project.offered_capacity.toLocaleString('de-DE')} kWh` 
+                        : project.estimated_capacity
+                          ? <span className="text-slate-500">{project.estimated_capacity} <span className="text-[10px] text-slate-400">(vorläufig)</span></span>
+                          : 'Keine Angabe'
+                      }
+                    </p>
+                  </div>
                 </div>
               </section>
 

@@ -44,3 +44,9 @@ Thumbs.db
 # Projektspezifische Hilfsdateien
 input_supabase.txt
 metadata.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

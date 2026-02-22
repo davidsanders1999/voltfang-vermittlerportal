@@ -11,9 +11,22 @@ import {
   Globe,
   Loader2,
   Check,
-  X
+  Users,
+  Link as LinkIcon,
+  Copy,
+  CheckCircle2,
+  UserPlus
 } from 'lucide-react';
 import { User, UserCompany } from '../types';
+
+interface TeamMember {
+  id: string;
+  fname: string;
+  lname: string;
+  email?: string;
+  created_at: string;
+  is_unlocked: boolean;
+}
 
 /**
  * Hilfskomponente für modern gestaltete Eingabefelder im Profil
@@ -36,32 +49,47 @@ const ProfileInput = ({ label, icon: Icon, ...props }: any) => (
 );
 
 /**
+ * Avatar-Komponente mit Initialen
+ */
+const Avatar = ({ fname, lname, isCurrentUser = false }: { fname: string; lname: string; isCurrentUser?: boolean }) => {
+  const initials = `${fname?.[0] || ''}${lname?.[0] || ''}`.toUpperCase();
+  
+  return (
+    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold ${
+      isCurrentUser 
+        ? 'bg-[#82a8a4] text-white' 
+        : 'bg-slate-100 text-slate-600'
+    }`}>
+      {initials}
+    </div>
+  );
+};
+
+/**
  * Profil-Ansicht zum Anzeigen und Bearbeiten der Nutzer- und Unternehmensdaten
  */
 const Profile: React.FC = () => {
-  // Lokaler State für Profil, Unternehmen und Status-Flags
   const [profile, setProfile] = useState<User | null>(null);
-  const [company, setCompany] = useState<UserCompany | null>(null);
+  const [company, setCompany] = useState<(UserCompany & { invite_code?: string }) | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  // State für die bearbeitbaren Felder
   const [editedProfile, setEditedProfile] = useState<Partial<User>>({});
   const [editedCompany, setEditedCompany] = useState<Partial<UserCompany>>({});
   
-  // Feedback-State (Error/Success)
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  /**
-   * Lädt die aktuellen Profil- und Unternehmensdaten aus Supabase
-   */
+  // Kopier-State
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const fetchProfileData = async () => {
     setLoading(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      
       if (!authUser) return;
 
       const { data: userData, error: userError } = await supabase
@@ -72,13 +100,11 @@ const Profile: React.FC = () => {
 
       if (userError) throw userError;
       
-      const extendedProfile = {
-        ...userData,
-        email: authUser.email
-      };
+      const extendedProfile = { ...userData, email: authUser.email };
       setProfile(extendedProfile);
 
       if (userData.company_id) {
+        // Unternehmensdaten laden
         const { data: companyData, error: companyError } = await supabase
           .from('usercompany')
           .select('*')
@@ -87,6 +113,16 @@ const Profile: React.FC = () => {
 
         if (companyError) throw companyError;
         setCompany(companyData);
+
+        // Teammitglieder laden
+        const { data: teamData, error: teamError } = await supabase
+          .from('user')
+          .select('id, fname, lname, email, created_at, is_unlocked')
+          .eq('company_id', userData.company_id)
+          .order('created_at', { ascending: true });
+
+        if (teamError) throw teamError;
+        setTeamMembers(teamData || []);
       }
     } catch (error) {
       console.error('Fehler beim Laden des Profils:', error);
@@ -99,6 +135,21 @@ const Profile: React.FC = () => {
   useEffect(() => {
     fetchProfileData();
   }, []);
+
+  const copyCode = async () => {
+    if (!company?.invite_code) return;
+    await navigator.clipboard.writeText(company.invite_code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const copyLink = async () => {
+    if (!company?.invite_code) return;
+    const link = `${window.location.origin}?invite=${company.invite_code}`;
+    await navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   const handleStartEditing = () => {
     if (profile) {
@@ -218,7 +269,7 @@ const Profile: React.FC = () => {
                 </h2>
                 <p className="text-xs text-slate-500 font-medium">{company?.name || 'Kein Unternehmen zugeordnet'}</p>
                 <div className="mt-3 flex gap-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[9px] font-bold uppercase rounded-md tracking-wider">Verifizierter Partner</span>
+                  <span className="px-2 py-0.5 bg-[#82a8a4]/10 text-[#5a7a76] border border-[#82a8a4]/30 text-[9px] font-bold uppercase rounded-md tracking-wider">Verifizierter Vermittlungspartner</span>
                 </div>
               </div>
             </div>
@@ -253,94 +304,6 @@ const Profile: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* UNTERNEHMENSINFORMATIONEN */}
-        <div className={`bg-white rounded-3xl shadow-sm border transition-all duration-500 p-8 space-y-8 ${isEditing ? 'border-[#82a8a4] ring-4 ring-[#82a8a4]/5' : 'border-slate-100'}`}>
-          <div className="flex items-center justify-between border-b border-slate-50 pb-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${isEditing ? 'bg-[#82a8a4] text-white' : 'bg-slate-50 text-[#82a8a4]'}`}>
-                <Building size={16} />
-              </div>
-              <h3 className={`font-bold text-[10px] uppercase tracking-widest ${isEditing ? 'text-[#82a8a4]' : 'text-slate-400'}`}>Unternehmensinformationen</h3>
-            </div>
-          </div>
-          
-          <div className="space-y-6">
-            {isEditing ? (
-              <div className="space-y-5 animate-in fade-in duration-500">
-                <ProfileInput 
-                  label="Unternehmensname" 
-                  icon={Building} 
-                  value={editedCompany.name || ''} 
-                  onChange={(e: any) => setEditedCompany({ ...editedCompany, name: e.target.value })}
-                />
-                <ProfileInput 
-                  label="Straße & Hausnummer" 
-                  icon={MapPin} 
-                  value={editedCompany.street || ''} 
-                  onChange={(e: any) => setEditedCompany({ ...editedCompany, street: e.target.value })}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <ProfileInput 
-                    label="PLZ" 
-                    icon={MapPin} 
-                    value={editedCompany.zip || ''} 
-                    onChange={(e: any) => setEditedCompany({ ...editedCompany, zip: e.target.value })}
-                  />
-                  <ProfileInput 
-                    label="Stadt" 
-                    icon={MapPin} 
-                    value={editedCompany.city || ''} 
-                    onChange={(e: any) => setEditedCompany({ ...editedCompany, city: e.target.value })}
-                  />
-                </div>
-                <ProfileInput 
-                  label="Land" 
-                  icon={Globe} 
-                  value={editedCompany.country || ''} 
-                  onChange={(e: any) => setEditedCompany({ ...editedCompany, country: e.target.value })}
-                />
-                <ProfileInput 
-                  label="Website" 
-                  icon={Globe} 
-                  type="url"
-                  value={editedCompany.website || ''} 
-                  onChange={(e: any) => setEditedCompany({ ...editedCompany, website: e.target.value })}
-                />
-              </div>
-            ) : (
-              company ? (
-                <div className="space-y-6">
-                  <div>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Unternehmensname</span>
-                    <p className="text-xs font-bold text-slate-800">{company.name}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Unternehmensstandort</span>
-                    <div className="flex items-start gap-2 text-slate-800">
-                      <MapPin size={14} className="text-slate-300 mt-0.5" />
-                      <p className="text-xs font-bold leading-relaxed">
-                        {company.street}<br />
-                        {company.zip} {company.city}<br />
-                        {company.country}
-                      </p>
-                    </div>
-                  </div>
-                  {company.website && (
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Website</span>
-                      <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#82a8a4] hover:underline flex items-center gap-1">
-                        <Globe size={12} /> Website besuchen
-                      </a>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400 italic text-center py-4">Keine Unternehmensdaten verfügbar.</p>
-              )
-            )}
-          </div>
-        </div>
-
         {/* PERSÖNLICHE INFORMATIONEN */}
         <div className={`bg-white rounded-3xl shadow-sm border transition-all duration-500 p-8 space-y-8 ${isEditing ? 'border-[#82a8a4] ring-4 ring-[#82a8a4]/5' : 'border-slate-100'}`}>
           <div className="flex items-center justify-between border-b border-slate-50 pb-3">
@@ -402,14 +365,192 @@ const Profile: React.FC = () => {
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Telefonnummer</span>
                   <div className="flex items-center gap-2 text-slate-800">
                     <Phone size={14} className="text-slate-300" />
-                    <p className="text-xs font-bold">{profile.phone}</p>
+                    <p className="text-xs font-bold">{profile.phone || '–'}</p>
                   </div>
                 </div>
               </div>
             )}
           </div>
         </div>
+
+        {/* UNTERNEHMENSINFORMATIONEN */}
+        <div className={`bg-white rounded-3xl shadow-sm border transition-all duration-500 p-8 space-y-8 ${isEditing ? 'border-[#82a8a4] ring-4 ring-[#82a8a4]/5' : 'border-slate-100'}`}>
+          <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${isEditing ? 'bg-[#82a8a4] text-white' : 'bg-slate-50 text-[#82a8a4]'}`}>
+                <Building size={16} />
+              </div>
+              <h3 className={`font-bold text-[10px] uppercase tracking-widest ${isEditing ? 'text-[#82a8a4]' : 'text-slate-400'}`}>Unternehmen</h3>
+            </div>
+          </div>
+          
+          <div className="space-y-6">
+            {isEditing ? (
+              <div className="space-y-5 animate-in fade-in duration-500">
+                <ProfileInput 
+                  label="Unternehmensname" 
+                  icon={Building} 
+                  value={editedCompany.name || ''} 
+                  onChange={(e: any) => setEditedCompany({ ...editedCompany, name: e.target.value })}
+                />
+                <ProfileInput 
+                  label="Straße & Hausnummer" 
+                  icon={MapPin} 
+                  value={editedCompany.street || ''} 
+                  onChange={(e: any) => setEditedCompany({ ...editedCompany, street: e.target.value })}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <ProfileInput 
+                    label="PLZ" 
+                    icon={MapPin} 
+                    value={editedCompany.zip || ''} 
+                    onChange={(e: any) => setEditedCompany({ ...editedCompany, zip: e.target.value })}
+                  />
+                  <ProfileInput 
+                    label="Stadt" 
+                    icon={MapPin} 
+                    value={editedCompany.city || ''} 
+                    onChange={(e: any) => setEditedCompany({ ...editedCompany, city: e.target.value })}
+                  />
+                </div>
+                <ProfileInput 
+                  label="Land" 
+                  icon={Globe} 
+                  value={editedCompany.country || ''} 
+                  onChange={(e: any) => setEditedCompany({ ...editedCompany, country: e.target.value })}
+                />
+                <ProfileInput 
+                  label="Website" 
+                  icon={Globe} 
+                  type="url"
+                  value={editedCompany.website || ''} 
+                  onChange={(e: any) => setEditedCompany({ ...editedCompany, website: e.target.value })}
+                />
+              </div>
+            ) : (
+              company ? (
+                <div className="space-y-6">
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Unternehmensname</span>
+                    <p className="text-xs font-bold text-slate-800">{company.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Standort</span>
+                    <div className="flex items-start gap-2 text-slate-800">
+                      <MapPin size={14} className="text-slate-300 mt-0.5" />
+                      <p className="text-xs font-bold leading-relaxed">
+                        {company.street}<br />
+                        {company.zip} {company.city}<br />
+                        {company.country}
+                      </p>
+                    </div>
+                  </div>
+                  {company.website && (
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Website</span>
+                      <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#82a8a4] hover:underline flex items-center gap-1">
+                        <Globe size={12} /> Website besuchen
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic text-center py-4">Keine Unternehmensdaten verfügbar.</p>
+              )
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* TEAM-SEKTION */}
+      {company && !isEditing && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-slate-50 text-[#82a8a4] flex items-center justify-center">
+                <Users size={16} />
+              </div>
+              <h3 className="font-bold text-[10px] uppercase tracking-widest text-slate-400">Team</h3>
+              <span className="text-[10px] font-bold text-slate-300 bg-slate-100 px-2 py-0.5 rounded-md">
+                {teamMembers.length} {teamMembers.length === 1 ? 'Mitglied' : 'Mitglieder'}
+              </span>
+            </div>
+          </div>
+
+          {/* Teammitglieder Liste */}
+          <div className="space-y-2">
+            {teamMembers.map((member) => (
+              <div 
+                key={member.id}
+                className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${
+                  member.id === profile.id ? 'bg-[#82a8a4]/5' : 'hover:bg-slate-50'
+                }`}
+              >
+                <Avatar 
+                  fname={member.fname} 
+                  lname={member.lname} 
+                  isCurrentUser={member.id === profile.id}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-slate-800 truncate">
+                      {member.fname} {member.lname}
+                    </p>
+                    {member.id === profile.id && (
+                      <span className="text-[9px] font-bold text-[#82a8a4] bg-[#82a8a4]/10 px-1.5 py-0.5 rounded">Du</span>
+                    )}
+                    {!member.is_unlocked && (
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Freischaltung ausstehend</span>
+                    )}
+                  </div>
+                  {member.email && (
+                    <p className="text-[10px] text-slate-400 truncate">{member.email}</p>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-300 hidden sm:block">
+                  seit {new Date(member.created_at).toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Dezenter Einladungscode-Bereich */}
+          {company.invite_code && (
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <UserPlus size={14} className="text-slate-300" />
+                  <p className="text-[11px] text-slate-400">
+                    Teammitglied einladen mit Code: <span className="font-mono font-bold text-slate-500">{company.invite_code.match(/.{1,4}/g)?.join('-')}</span>
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={copyCode}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                      copiedCode 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'text-slate-400 hover:text-[#82a8a4] hover:bg-slate-50'
+                    }`}
+                  >
+                    {copiedCode ? <><CheckCircle2 size={12} /> Kopiert</> : <><Copy size={12} /> Code</>}
+                  </button>
+                  <button
+                    onClick={copyLink}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                      copiedLink 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'text-slate-400 hover:text-[#82a8a4] hover:bg-slate-50'
+                    }`}
+                  >
+                    {copiedLink ? <><CheckCircle2 size={12} /> Kopiert</> : <><LinkIcon size={12} /> Link</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Meta Infos */}
       {!isEditing && (

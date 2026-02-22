@@ -19,7 +19,7 @@ export interface Project {
   company_name: string;
   website?: string;
   status: ProjectStatus;
-  volume?: number;
+  offered_capacity?: number;
   contact_fname: string;
   contact_lname: string;
   contact_email: string;
