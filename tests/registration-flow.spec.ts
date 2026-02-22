@@ -106,7 +106,7 @@ async function fillCompanyData(
   await page.locator('input[name="city"]').fill(company.city);
   await page.waitForTimeout(DELAY);
   
-  await page.locator('input[name="country"]').fill(company.country);
+  await page.locator('select[name="country"]').selectOption(company.country);
   await page.waitForTimeout(DELAY);
 }
 
