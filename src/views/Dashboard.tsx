@@ -120,7 +120,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const data = months.map(m => ({ month: m, capacity: 0 }));
     
     const filteredForYear = projects.filter(p => 
-      p.status === 'Gewonnen' && 
+      p.dealstage === 'Gewonnen' && 
       p.estimated_order_date && 
       new Date(p.estimated_order_date).getFullYear() === parseInt(selectedYear)
     );
@@ -141,15 +141,15 @@ const Dashboard: React.FC<DashboardProps> = ({
    */
   const funnelData = useMemo(() => {
     const statusCounts = projects.reduce((acc, p) => {
-      acc[p.status] = (acc[p.status] || 0) + 1;
+      acc[p.dealstage] = (acc[p.dealstage] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     // Nur aktive Phasen für den Funnel mit Balken
     const activePipeline = [
-      { status: 'Lead übergeben', count: statusCounts['Lead übergeben'] || 0 },
+      { status: 'Eingangsprüfung', count: statusCounts['Eingangsprüfung'] || 0 },
       { status: 'Technische Klärung', count: statusCounts['Technische Klärung'] || 0 },
-      { status: 'Vertragliche Klärung', count: statusCounts['Vertragliche Klärung'] || 0 },
+      { status: 'Angebotsklärung', count: statusCounts['Angebotsklärung'] || 0 },
       { status: 'Closing', count: statusCounts['Closing'] || 0 },
     ];
 
@@ -169,8 +169,8 @@ const Dashboard: React.FC<DashboardProps> = ({
    * Berechnet globale Statistiken (KPIs) basierend auf dem Projektstand
    */
   const stats = useMemo(() => {
-    const wonCount = projects.filter(p => p.status === 'Gewonnen').length;
-    const lostCount = projects.filter(p => p.status === 'Verloren').length;
+    const wonCount = projects.filter(p => p.dealstage === 'Gewonnen').length;
+    const lostCount = projects.filter(p => p.dealstage === 'Verloren').length;
     const totalFinished = wonCount + lostCount;
     
     // Abschlussquote (Gewonnen vs. Verloren)
@@ -179,7 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       : '-%';
 
     // Aktive Projekte (nicht gewonnen/verloren)
-    const activeProjects = projects.filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren');
+    const activeProjects = projects.filter(p => p.dealstage !== 'Gewonnen' && p.dealstage !== 'Verloren');
     const activeCount = activeProjects.length;
 
     // Laufende Angebote: Aktive Projekte mit eingetragener Kapazität
@@ -209,7 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const yearCapacity = useMemo(() => {
     return projects
       .filter(p => 
-        p.status === 'Gewonnen' && 
+        p.dealstage === 'Gewonnen' && 
         p.estimated_order_date && 
         new Date(p.estimated_order_date).getFullYear() === parseInt(selectedYear)
       )
@@ -347,9 +347,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             {funnelData.activePipeline.map((item: any, i: number) => {
               const percentage = funnelData.totalActive > 0 ? (item.count / funnelData.totalActive) * 100 : 0;
               const barColors: Record<string, string> = {
-                'Lead übergeben': 'bg-[#82a8a4]/40',
+                'Eingangsprüfung': 'bg-[#82a8a4]/40',
                 'Technische Klärung': 'bg-[#82a8a4]/60',
-                'Vertragliche Klärung': 'bg-[#82a8a4]/80',
+                'Angebotsklärung': 'bg-[#82a8a4]/80',
                 'Closing': 'bg-[#82a8a4]',
               };
 
@@ -427,13 +427,13 @@ const Dashboard: React.FC<DashboardProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {projects.filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren').length === 0 ? (
+              {projects.filter(p => p.dealstage !== 'Gewonnen' && p.dealstage !== 'Verloren').length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-xs">Noch keine aktiven Projekte vorhanden.</td>
                 </tr>
               ) : (
                 projects
-                  .filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren')
+                  .filter(p => p.dealstage !== 'Gewonnen' && p.dealstage !== 'Verloren')
                   .slice(0, 4)
                   .map((p) => (
                     <tr 
@@ -443,7 +443,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     >
                       <td className="px-6 py-4">
                         <p className="text-xs font-bold text-slate-800 group-hover:text-[#82a8a4] transition-colors">{p.name}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{p.company_name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{p.unternehmen_name}</p>
                       </td>
                       <td className="px-6 py-4 text-xs font-bold text-slate-700">
                         {p.offered_capacity 
@@ -455,7 +455,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </td>
                       <td className="px-6 py-4 text-xs font-medium text-slate-600">{p.location_city}</td>
                       <td className="px-6 py-4">
-                        <StatusBadge status={p.status} />
+                        <StatusBadge status={p.dealstage} />
                       </td>
                       <td className="px-6 py-4 text-xs font-medium text-slate-500">{new Date(p.created_at).toLocaleDateString('de-DE')}</td>
                     </tr>

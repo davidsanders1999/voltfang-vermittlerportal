@@ -27,22 +27,28 @@ const testData = {
   user1: {
     email: `${TEST_PREFIX}.owner.${timestamp}@${TEST_EMAIL_DOMAIN}`,
     password: 'TestPasswort123!',
+    salutation: 'Herr',
     fname: 'Max',
     lname: 'Mustermann',
+    rolle_im_unternehmen: 'Geschäftsführer',
     phone: '+49 123 456789',
   },
   user2: {
     email: `${TEST_PREFIX}.member.${timestamp}@${TEST_EMAIL_DOMAIN}`,
     password: 'TestPasswort456!',
+    salutation: 'Frau',
     fname: 'Erika',
     lname: 'Musterfrau',
+    rolle_im_unternehmen: 'Vertriebsleiterin',
     phone: '+49 987 654321',
   },
   company: {
     name: `Test Unternehmen ${timestamp}`,
+    branche_partner: 'Energieberater',
     street: 'Teststraße 42',
     zip: '12345',
     city: 'Berlin',
+    bundesland: 'Berlin',
     country: 'Deutschland',
     website: 'https://test-unternehmen.de',
   },
@@ -62,11 +68,19 @@ async function fillPersonalData(
   await expect(page.locator('h2:has-text("Persönliche Daten")')).toBeVisible();
   await page.waitForTimeout(DELAY);
 
+  // Anrede (Pflichtfeld)
+  await page.locator('select[name="salutation"]').selectOption(user.salutation);
+  await page.waitForTimeout(DELAY);
+
   // Fülle die Felder aus
   await page.locator('input[name="fname"]').fill(user.fname);
   await page.waitForTimeout(DELAY);
   
   await page.locator('input[name="lname"]').fill(user.lname);
+  await page.waitForTimeout(DELAY);
+
+  // Rolle im Unternehmen (Pflichtfeld)
+  await page.locator('input[name="rolle_im_unternehmen"]').fill(user.rolle_im_unternehmen);
   await page.waitForTimeout(DELAY);
   
   await page.locator('input[name="email"]').fill(user.email);
@@ -93,7 +107,13 @@ async function fillCompanyData(
   // Fülle die Felder aus
   await page.locator('input[name="companyName"]').fill(company.name);
   await page.waitForTimeout(DELAY);
-  
+
+  // Branche (Pflichtfeld) – warten bis Select sichtbar, dann per Wert wählen
+  const brancheSelect = page.locator('select[name="branche_partner"]');
+  await expect(brancheSelect).toBeVisible();
+  await brancheSelect.selectOption({ value: company.branche_partner });
+  await page.waitForTimeout(DELAY);
+
   await page.locator('input[name="website"]').fill(company.website);
   await page.waitForTimeout(DELAY);
   
@@ -105,8 +125,9 @@ async function fillCompanyData(
   
   await page.locator('input[name="city"]').fill(company.city);
   await page.waitForTimeout(DELAY);
-  
-  await page.locator('select[name="country"]').selectOption(company.country);
+
+  // Bundesland (Pflichtfeld)
+  await page.locator('select[name="bundesland"]').selectOption(company.bundesland);
   await page.waitForTimeout(DELAY);
 }
 
@@ -357,8 +378,10 @@ test.describe('Registrierungs-Flow mit Einladungscode', () => {
     const user3 = {
       email: `${TEST_PREFIX}.manual.${timestamp}@${TEST_EMAIL_DOMAIN}`,
       password: 'TestPasswort789!',
+      salutation: 'Herr',
       fname: 'Hans',
       lname: 'Hansen',
+      rolle_im_unternehmen: 'Ingenieur',
       phone: '+49 111 222333',
     };
 
@@ -487,37 +510,53 @@ test.describe('Registrierungs-Flow mit Einladungscode', () => {
     
     // === PROJEKTDATEN DEFINIEREN (alle Felder sind jetzt Pflichtfelder) ===
     const project1 = {
-      // Schritt 1: Kontakt
-      company_name: 'Alpha Energie GmbH',
-      website: 'https://alpha-energie.de',
-      contact_fname: 'Anna',
-      contact_lname: 'Alpha',
-      contact_email: 'anna@alpha-energie.de',
-      contact_phone: '+49 30 12345678',
-      // Schritt 2: Projekt
+      // Schritt 1: Projektdetails & Standort
       name: `E2E Projekt Alpha ${TEST_PREFIX}`,
       estimated_order_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 Tage
       estimated_capacity: '500 - 1000 kWh',
       location_street: 'Alphastraße 1',
       location_zip: '10115',
       location_city: 'Berlin',
+      location_state: 'Berlin',
+      // Schritt 2: Projektunternehmen
+      unternehmen_name: 'Alpha Energie GmbH',
+      unternehmen_website: 'https://alpha-energie.de',
+      unternehmen_street: 'Allee der Kosmonauten 1',
+      unternehmen_zip: '12681',
+      unternehmen_city: 'Berlin',
+      unternehmen_state: 'Berlin',
+      // Schritt 2: Projektkontakt
+      kontakt_salutation: 'Frau',
+      kontakt_fname: 'Anna',
+      kontakt_lname: 'Alpha',
+      kontakt_rolle_im_unternehmen: 'Einkaufsleiterin',
+      kontakt_email: 'anna@alpha-energie.de',
+      kontakt_phone: '+49 30 12345678',
     };
 
     const project2 = {
-      // Schritt 1: Kontakt
-      company_name: 'Beta Solar AG',
-      website: 'https://beta-solar.de',
-      contact_fname: 'Bruno',
-      contact_lname: 'Beta',
-      contact_email: 'bruno@beta-solar.de',
-      contact_phone: '+49 89 98765432',
-      // Schritt 2: Projekt
+      // Schritt 1: Projektdetails & Standort
       name: `E2E Projekt Beta ${TEST_PREFIX}`,
       estimated_order_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +60 Tage
       estimated_capacity: '1000 - 5000 kWh',
       location_street: 'Betaweg 42',
       location_zip: '80331',
       location_city: 'München',
+      location_state: 'Bayern',
+      // Schritt 2: Projektunternehmen
+      unternehmen_name: 'Beta Solar AG',
+      unternehmen_website: 'https://beta-solar.de',
+      unternehmen_street: 'Leopoldstraße 10',
+      unternehmen_zip: '80802',
+      unternehmen_city: 'München',
+      unternehmen_state: 'Bayern',
+      // Schritt 2: Projektkontakt
+      kontakt_salutation: 'Herr',
+      kontakt_fname: 'Bruno',
+      kontakt_lname: 'Beta',
+      kontakt_rolle_im_unternehmen: 'Projektleiter',
+      kontakt_email: 'bruno@beta-solar.de',
+      kontakt_phone: '+49 89 98765432',
     };
 
     // === USER 1 LOGGT SICH EIN UND ERSTELLT PROJEKT 1 ===
@@ -559,25 +598,40 @@ test.describe('Registrierungs-Flow mit Einladungscode', () => {
     await page.waitForTimeout(DELAY);
     await page.locator('input[name="location_city"]').fill(project1.location_city);
     await page.waitForTimeout(DELAY);
+    await page.locator('select[name="location_state"]').selectOption(project1.location_state);
+    await page.waitForTimeout(DELAY);
     // Land hat bereits Standardwert "Deutschland"
     await page.locator('button:has-text("Weiter")').click();
     await page.waitForTimeout(DELAY);
 
-    // === SCHRITT 2: KUNDE (Unternehmen & Ansprechpartner) ===
-    await expect(page.locator('h2:has-text("Unternehmen")')).toBeVisible({ timeout: 5000 });
-    await page.locator('input[name="company_name"]').fill(project1.company_name);
+    // === SCHRITT 2: PROJEKTUNTERNEHMEN & PROJEKTKONTAKT ===
+    await expect(page.locator('h2:has-text("Projektunternehmen")')).toBeVisible({ timeout: 5000 });
+    await page.locator('input[name="unternehmen_name"]').fill(project1.unternehmen_name);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="website"]').fill(project1.website);
+    await page.locator('input[name="unternehmen_website"]').fill(project1.unternehmen_website);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_fname"]').fill(project1.contact_fname);
+    await page.locator('input[name="unternehmen_street"]').fill(project1.unternehmen_street);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_lname"]').fill(project1.contact_lname);
+    await page.locator('input[name="unternehmen_zip"]').fill(project1.unternehmen_zip);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_email"]').fill(project1.contact_email);
+    await page.locator('input[name="unternehmen_city"]').fill(project1.unternehmen_city);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_phone"]').fill(project1.contact_phone);
+    await page.locator('select[name="unternehmen_state"]').selectOption(project1.unternehmen_state);
     await page.waitForTimeout(DELAY);
-    
+    // Unternehmen Land hat bereits Standardwert "Deutschland"
+    await page.locator('select[name="kontakt_salutation"]').selectOption(project1.kontakt_salutation);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_fname"]').fill(project1.kontakt_fname);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_lname"]').fill(project1.kontakt_lname);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_rolle_im_unternehmen"]').fill(project1.kontakt_rolle_im_unternehmen);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_email"]').fill(project1.kontakt_email);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_phone"]').fill(project1.kontakt_phone);
+    await page.waitForTimeout(DELAY);
+
     // Klicke auf "Projekt erstellen" Button
     await page.locator('button:has-text("Projekt erstellen")').click();
     await page.waitForTimeout(1500); // Etwas mehr Zeit für die Erstellung
@@ -637,25 +691,40 @@ test.describe('Registrierungs-Flow mit Einladungscode', () => {
     await page.waitForTimeout(DELAY);
     await page.locator('input[name="location_city"]').fill(project2.location_city);
     await page.waitForTimeout(DELAY);
+    await page.locator('select[name="location_state"]').selectOption(project2.location_state);
+    await page.waitForTimeout(DELAY);
     // Land hat bereits Standardwert "Deutschland"
     await page.locator('button:has-text("Weiter")').click();
     await page.waitForTimeout(DELAY);
 
-    // === SCHRITT 2: KUNDE (Unternehmen & Ansprechpartner) ===
-    await expect(page.locator('h2:has-text("Unternehmen")')).toBeVisible({ timeout: 5000 });
-    await page.locator('input[name="company_name"]').fill(project2.company_name);
+    // === SCHRITT 2: PROJEKTUNTERNEHMEN & PROJEKTKONTAKT ===
+    await expect(page.locator('h2:has-text("Projektunternehmen")')).toBeVisible({ timeout: 5000 });
+    await page.locator('input[name="unternehmen_name"]').fill(project2.unternehmen_name);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="website"]').fill(project2.website);
+    await page.locator('input[name="unternehmen_website"]').fill(project2.unternehmen_website);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_fname"]').fill(project2.contact_fname);
+    await page.locator('input[name="unternehmen_street"]').fill(project2.unternehmen_street);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_lname"]').fill(project2.contact_lname);
+    await page.locator('input[name="unternehmen_zip"]').fill(project2.unternehmen_zip);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_email"]').fill(project2.contact_email);
+    await page.locator('input[name="unternehmen_city"]').fill(project2.unternehmen_city);
     await page.waitForTimeout(DELAY);
-    await page.locator('input[name="contact_phone"]').fill(project2.contact_phone);
+    await page.locator('select[name="unternehmen_state"]').selectOption(project2.unternehmen_state);
     await page.waitForTimeout(DELAY);
-    
+    // Unternehmen Land hat bereits Standardwert "Deutschland"
+    await page.locator('select[name="kontakt_salutation"]').selectOption(project2.kontakt_salutation);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_fname"]').fill(project2.kontakt_fname);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_lname"]').fill(project2.kontakt_lname);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_rolle_im_unternehmen"]').fill(project2.kontakt_rolle_im_unternehmen);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_email"]').fill(project2.kontakt_email);
+    await page.waitForTimeout(DELAY);
+    await page.locator('input[name="kontakt_phone"]').fill(project2.kontakt_phone);
+    await page.waitForTimeout(DELAY);
+
     // Klicke auf "Projekt erstellen" Button
     await page.locator('button:has-text("Projekt erstellen")').click();
     await page.waitForTimeout(1500); // Etwas mehr Zeit für die Erstellung

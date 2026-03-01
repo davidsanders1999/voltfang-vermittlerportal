@@ -41,7 +41,7 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
     try {
       const { data, error } = await supabase
         .from('project')
-        .select('*')
+        .select('*, creator:created_by_user_id(fname, lname)')
         .eq('company_id', userProfile.company_id)
         .order('created_at', { ascending: false });
 
@@ -82,6 +82,7 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
     return (
       <ProjektFormular 
         userCompanyId={userProfile?.company_id || null}
+        userId={userProfile?.id || null}
         onBack={() => setShowForm(false)} 
         onSubmit={() => {
           setShowForm(false);

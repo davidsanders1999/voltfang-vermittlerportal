@@ -5,7 +5,6 @@ import {
   Building, 
   Navigation, 
   Clock, 
-  Pencil, 
   CalendarClock, 
   User, 
   Mail, 
@@ -14,7 +13,7 @@ import {
   ExternalLink 
 } from 'lucide-react';
 import { Project } from '../../types';
-import { StatusBadge, PipelineVisualizer } from './ProjekteShared';
+import { PipelineVisualizer } from './ProjekteShared';
 
 /**
  * Props für die ProjektDetail-Komponente
@@ -30,8 +29,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
   
   // Effekt für die Konfetti-Animation bei gewonnenen Projekten
   useEffect(() => {
-    // Nur auslösen, wenn das Projekt den Status 'Gewonnen' hat
-    if (project.status === 'Gewonnen') {
+    if (project.dealstage === 'Gewonnen') {
       const duration = 3 * 1000; // 3 Sekunden Animationsdauer
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
@@ -71,7 +69,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
       // Cleanup: Intervall löschen, wenn Komponente unmountet
       return () => clearInterval(interval);
     }
-  }, [project.id, project.status]); // Reagiert auf ID oder Status-Änderung
+  }, [project.id, project.dealstage]);
 
   /**
    * Hilfsfunktion zur Formatierung von Datums-Strings ins deutsche Format
@@ -107,7 +105,6 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h2 className="text-xl font-bold text-slate-800 tracking-tight">{project.name}</h2>
-                  <StatusBadge status={project.status} />
                 </div>
                 <div className="flex items-center gap-5 text-slate-500 text-xs font-medium">
                    <div className="flex items-center gap-1.5">
@@ -117,14 +114,19 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                 </div>
               </div>
             </div>
-            {/* Bearbeiten-Button (Platzhalter) */}
-            <div className="flex gap-2">
-              <button 
-                className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-[#82a8a4] hover:border-[#82a8a4] transition-all active:scale-90"
-                title="Projekt bearbeiten"
-              >
-                <Pencil size={16} />
-              </button>
+            {/* Creator-Banner */}
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+              <div className="w-9 h-9 rounded-xl bg-[#82a8a4]/10 text-[#82a8a4] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                {project.creator.fname[0]}{project.creator.lname[0]}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 truncate">
+                  {project.creator.fname} {project.creator.lname}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  seit {new Date(project.created_at).toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -135,7 +137,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
              <div className="flex justify-between items-center mb-6 px-4">
                 <h3 className="font-bold text-[9px] text-slate-400 uppercase tracking-[0.2em]">Pipeline Progress</h3>
              </div>
-             <PipelineVisualizer status={project.status} />
+             <PipelineVisualizer status={project.dealstage} />
            </div>
         </div>
 
@@ -145,46 +147,61 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
             
             {/* --- LINKE SPALTE: UNTERNEHMEN & KONTAKT --- */}
             <div className="space-y-10">
-              {/* Unternehmensinfo */}
+              {/* Projektunternehmen */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
                     <Building size={14} />
                   </div>
-                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Unternehmensinformationen</h3>
+                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Projektunternehmen</h3>
                 </div>
-                <div className="pl-10">
+                <div className="pl-10 space-y-4">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Unternehmensname</span>
-                    <a href={project.website} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-[#82a8a4] hover:underline flex items-center gap-1.5 group/link">
-                       {project.company_name} 
-                       <ExternalLink size={12} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                    </a>
+                    {project.unternehmen_website ? (
+                      <a href={project.unternehmen_website} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-[#82a8a4] hover:underline flex items-center gap-1.5 group/link">
+                        {project.unternehmen_name}
+                        <ExternalLink size={12} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                      </a>
+                    ) : (
+                      <span className="text-sm font-bold text-slate-700">{project.unternehmen_name}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Anschrift</span>
+                    <p className="text-xs font-bold text-slate-700 leading-relaxed">
+                      {project.unternehmen_street}<br />
+                      {project.unternehmen_zip} {project.unternehmen_city}<br />
+                      {project.unternehmen_state}, {project.unternehmen_country}
+                    </p>
                   </div>
                 </div>
               </section>
 
-              {/* Externer Ansprechpartner (Kunde) */}
+              {/* Projektkontakt */}
               <section className="space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-[#82a8a4]">
                     <User size={14} />
                   </div>
-                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Ansprechpartner (Extern)</h3>
+                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Projektkontakt</h3>
                 </div>
                 <div className="pl-10 space-y-4">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Name</span>
-                    <span className="text-xs font-bold text-slate-700">{project.contact_fname} {project.contact_lname}</span>
+                    <span className="text-xs font-bold text-slate-700">
+                      {project.kontakt_salutation} {project.kontakt_fname} {project.kontakt_lname}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">{project.kontakt_rolle_im_unternehmen}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Kontakt</span>
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                        <Mail size={14} className="text-[#82a8a4]/50" /> {project.contact_email}
+                        <Mail size={14} className="text-[#82a8a4]/50" /> {project.kontakt_email}
                       </div>
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                        <Phone size={14} className="text-[#82a8a4]/50" /> {project.contact_phone || 'Keine Angabe'}
+                        <Phone size={14} className="text-[#82a8a4]/50" /> {project.kontakt_phone}
                       </div>
                     </div>
                   </div>
@@ -257,7 +274,7 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                     <p className="text-xs font-bold text-slate-700 leading-relaxed">
                       {project.location_street}<br />
                       {project.location_zip} {project.location_city}<br />
-                      {project.location_country}
+                      {project.location_state}, {project.location_country}
                     </p>
                   </div>
                 </div>

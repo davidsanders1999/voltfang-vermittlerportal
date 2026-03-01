@@ -4,7 +4,6 @@ import {
   Mail, 
   Lock, 
   Loader2, 
-  UserPlus, 
   Building, 
   User, 
   Phone, 
@@ -15,7 +14,8 @@ import {
   CheckCircle2,
   Ticket,
   Users,
-  AlertCircle
+  AlertCircle,
+  Briefcase
 } from 'lucide-react';
 import {
   isValidEmail,
@@ -27,6 +27,7 @@ import {
   hasMinLength,
   ValidationErrors
 } from '../utils/validation';
+import { GERMAN_STATES, SALUTATIONS } from '../types';
 
 /**
  * Daten für die Registrierungs-Erfolgsseite
@@ -85,16 +86,27 @@ const Register: React.FC<RegisterProps> = ({
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    salutation: '' as typeof SALUTATIONS[number] | '',
     fname: '',
     lname: '',
+    rolle_im_unternehmen: '',
     phone: '',
     companyName: '',
     website: '',
     street: '',
     zip: '',
     city: '',
-    country: 'Deutschland'
+    bundesland: '' as typeof GERMAN_STATES[number] | '',
+    country: 'Deutschland',
+    branche_partner: '',
   });
+
+  const BRANCHE_OPTIONS = [
+    'Agentur', 'Berater', 'Dienstleister', 'Elektriker', 'Energieberater',
+    'EPC', 'EVU / Stadtwerke', 'Gewerblicher Endkunde', 'Großhandel',
+    'Ladesäulenbetreiber', 'OEM', 'Planungsbüro', 'Privater Endkunde',
+    'Solarinstallateur', 'Sonstiger Multiplikator', 'Voltfang Freelancer',
+  ];
 
   // Validierungsfehler pro Feld
   const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({});
@@ -106,23 +118,15 @@ const Register: React.FC<RegisterProps> = ({
    */
   const validateStep1 = (): ValidationErrors => {
     const errors: ValidationErrors = {};
-    
-    if (!isValidName(formData.fname)) {
-      errors.fname = 'Bitte geben Sie einen gültigen Vornamen ein (min. 2 Zeichen)';
-    }
-    if (!isValidName(formData.lname)) {
-      errors.lname = 'Bitte geben Sie einen gültigen Nachnamen ein (min. 2 Zeichen)';
-    }
-    if (!isValidEmail(formData.email)) {
-      errors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
-    }
-    if (!isValidPassword(formData.password)) {
-      errors.password = 'Mindestens 8 Zeichen und 1 Zahl erforderlich';
-    }
-    if (formData.phone && !isValidPhone(formData.phone)) {
-      errors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
-    }
-    
+
+    if (!formData.salutation) errors.salutation = 'Bitte wählen Sie eine Anrede';
+    if (!isValidName(formData.fname)) errors.fname = 'Bitte geben Sie einen gültigen Vornamen ein (min. 2 Zeichen)';
+    if (!isValidName(formData.lname)) errors.lname = 'Bitte geben Sie einen gültigen Nachnamen ein (min. 2 Zeichen)';
+    if (!hasMinLength(formData.rolle_im_unternehmen, 2)) errors.rolle_im_unternehmen = 'Bitte geben Sie Ihre Rolle an (min. 2 Zeichen)';
+    if (!isValidEmail(formData.email)) errors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
+    if (!isValidPassword(formData.password)) errors.password = 'Mindestens 8 Zeichen und 1 Zahl erforderlich';
+    if (formData.phone && !isValidPhone(formData.phone)) errors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
+
     return errors;
   };
 
@@ -131,26 +135,18 @@ const Register: React.FC<RegisterProps> = ({
    */
   const validateStep2 = (): ValidationErrors => {
     const errors: ValidationErrors = {};
-    
+
     // Wenn Einladung vorhanden, keine Unternehmensdaten validieren
     if (invitationInfo) return errors;
-    
-    if (!hasMinLength(formData.companyName, 2)) {
-      errors.companyName = 'Bitte geben Sie einen Unternehmensnamen ein (min. 2 Zeichen)';
-    }
-    if (formData.website && !isValidUrl(formData.website)) {
-      errors.website = 'Bitte geben Sie eine gültige URL ein (z.B. https://beispiel.de)';
-    }
-    if (!hasMinLength(formData.street, 3)) {
-      errors.street = 'Bitte geben Sie eine gültige Adresse ein';
-    }
-    if (!isValidZip(formData.zip)) {
-      errors.zip = 'Bitte geben Sie eine gültige PLZ ein (4-5 Ziffern)';
-    }
-    if (!hasMinLength(formData.city, 2)) {
-      errors.city = 'Bitte geben Sie eine Stadt ein';
-    }
-    
+
+    if (!hasMinLength(formData.companyName, 2)) errors.companyName = 'Bitte geben Sie einen Unternehmensnamen ein (min. 2 Zeichen)';
+    if (!formData.branche_partner) errors.branche_partner = 'Bitte wählen Sie eine Branche';
+    if (formData.website && !isValidUrl(formData.website)) errors.website = 'Bitte geben Sie eine gültige URL ein (z.B. https://beispiel.de)';
+    if (!hasMinLength(formData.street, 3)) errors.street = 'Bitte geben Sie eine gültige Adresse ein';
+    if (!isValidZip(formData.zip)) errors.zip = 'Bitte geben Sie eine gültige PLZ ein (4-5 Ziffern)';
+    if (!hasMinLength(formData.city, 2)) errors.city = 'Bitte geben Sie eine Stadt ein';
+    if (!formData.bundesland) errors.bundesland = 'Bitte wählen Sie ein Bundesland';
+
     return errors;
   };
 
@@ -159,9 +155,13 @@ const Register: React.FC<RegisterProps> = ({
    */
   const validateField = (name: string, value: string): string | undefined => {
     switch (name) {
+      case 'salutation':
+        return value ? undefined : 'Bitte Anrede auswählen';
       case 'fname':
       case 'lname':
         return isValidName(value) ? undefined : 'Mindestens 2 Zeichen erforderlich';
+      case 'rolle_im_unternehmen':
+        return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
       case 'email':
         return isValidEmail(value) ? undefined : 'Ungültige E-Mail-Adresse';
       case 'password':
@@ -178,6 +178,10 @@ const Register: React.FC<RegisterProps> = ({
         return invitationInfo || isValidZip(value) ? undefined : '4-5 Ziffern';
       case 'city':
         return invitationInfo || hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen';
+      case 'bundesland':
+        return invitationInfo || value ? undefined : 'Bundesland auswählen';
+      case 'branche_partner':
+        return invitationInfo || value ? undefined : 'Branche auswählen';
       default:
         return undefined;
     }
@@ -321,8 +325,16 @@ const Register: React.FC<RegisterProps> = ({
         });
 
         if (rpcError) throw rpcError;
+
+        // Salutation + Rolle in user-Tabelle nachpflegen
+        await supabase
+          .from('user')
+          .update({ salutation: formData.salutation || null, rolle_im_unternehmen: formData.rolle_im_unternehmen || null })
+          .eq('auth_id', authData.user.id);
       } else {
         // 2b. Normale Registrierung: Neues Unternehmen erstellen
+        // Hinweis: Die Supabase-RPC handle_new_partner_registration muss p_branche_partner und p_bundesland
+        // akzeptieren und beim INSERT in usercompany setzen (branche_partner ist NOT NULL).
         const { error: rpcError } = await supabase.rpc('handle_new_partner_registration', {
           p_auth_id: authData.user.id,
           p_fname: formData.fname,
@@ -335,9 +347,25 @@ const Register: React.FC<RegisterProps> = ({
           p_city: formData.city,
           p_country: formData.country,
           p_email: formData.email,
+          p_branche_partner: formData.branche_partner || null,
+          p_bundesland: formData.bundesland || null,
         });
 
         if (rpcError) throw rpcError;
+
+        // Salutation + Rolle in user (Branche/Bundesland sind bereits in der RPC gesetzt)
+        const { data: userData } = await supabase
+          .from('user')
+          .select('id, company_id')
+          .eq('auth_id', authData.user.id)
+          .single();
+
+        if (userData) {
+          await supabase
+            .from('user')
+            .update({ salutation: formData.salutation || null, rolle_im_unternehmen: formData.rolle_im_unternehmen || null })
+            .eq('id', userData.id);
+        }
       }
 
       // Wichtig: User ausloggen, damit die Erfolgsseite angezeigt wird
@@ -372,8 +400,7 @@ const Register: React.FC<RegisterProps> = ({
       const errors = validateStep1();
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        // Markiere alle Felder als "berührt"
-        setTouchedFields(new Set(['fname', 'lname', 'email', 'password', 'phone']));
+        setTouchedFields(new Set(['salutation', 'fname', 'lname', 'rolle_im_unternehmen', 'email', 'password', 'phone']));
         return;
       }
       setStep(2);
@@ -382,7 +409,7 @@ const Register: React.FC<RegisterProps> = ({
       const errors = validateStep2();
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        setTouchedFields(new Set(['companyName', 'website', 'street', 'zip', 'city']));
+        setTouchedFields(new Set(['companyName', 'branche_partner', 'website', 'street', 'zip', 'city', 'bundesland']));
         return;
       }
       handleRegister(e);
@@ -420,6 +447,22 @@ const Register: React.FC<RegisterProps> = ({
                     <h2 className="font-bold text-xs text-slate-700">Persönliche Daten</h2>
                   </div>
 
+                  {/* Anrede */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Anrede</label>
+                    <select
+                      name="salutation"
+                      value={formData.salutation}
+                      onChange={(e) => setFormData(prev => ({ ...prev, salutation: e.target.value as typeof SALUTATIONS[number] | '' }))}
+                      onBlur={handleBlur}
+                      className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 appearance-none cursor-pointer ${fieldErrors.salutation ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                    >
+                      <option value="">Anrede auswählen...</option>
+                      {SALUTATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    {fieldErrors.salutation && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.salutation}</p>}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Vorname</label>
@@ -438,6 +481,17 @@ const Register: React.FC<RegisterProps> = ({
                       {fieldErrors.lname && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.lname}</p>}
                     </div>
                   </div>
+
+                  {/* Rolle im Unternehmen */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Rolle im Unternehmen</label>
+                    <div className="relative group">
+                      <Briefcase className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.rolle_im_unternehmen ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
+                      <input type="text" name="rolle_im_unternehmen" value={formData.rolle_im_unternehmen} onChange={handleChange} onBlur={handleBlur} placeholder="z.B. Geschäftsführer, Vertriebsleiter" className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.rolle_im_unternehmen ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`} />
+                    </div>
+                    {fieldErrors.rolle_im_unternehmen && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.rolle_im_unternehmen}</p>}
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">E-Mail Adresse</label>
                     <div className="relative group">
@@ -562,6 +616,22 @@ const Register: React.FC<RegisterProps> = ({
                         {fieldErrors.companyName && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.companyName}</p>}
                       </div>
 
+                      {/* Branche (Pflichtfeld) */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Branche</label>
+                        <select
+                          name="branche_partner"
+                          value={formData.branche_partner}
+                          onChange={(e) => setFormData(prev => ({ ...prev, branche_partner: e.target.value }))}
+                          onBlur={handleBlur}
+                          className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 appearance-none cursor-pointer ${fieldErrors.branche_partner ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        >
+                          <option value="">Branche auswählen...</option>
+                          {BRANCHE_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                        {fieldErrors.branche_partner && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.branche_partner}</p>}
+                      </div>
+
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Website <span className="text-slate-300">(optional)</span></label>
                         <div className="relative group">
@@ -591,6 +661,22 @@ const Register: React.FC<RegisterProps> = ({
                           <input type="text" name="city" value={formData.city} onChange={handleChange} onBlur={handleBlur} placeholder="Berlin" className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.city ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`} />
                           {fieldErrors.city && <p className="text-[10px] text-red-500 font-medium flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.city}</p>}
                         </div>
+                      </div>
+
+                      {/* Bundesland */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Bundesland</label>
+                        <select
+                          name="bundesland"
+                          value={formData.bundesland}
+                          onChange={(e) => setFormData(prev => ({ ...prev, bundesland: e.target.value as typeof GERMAN_STATES[number] | '' }))}
+                          onBlur={handleBlur}
+                          className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 appearance-none cursor-pointer ${fieldErrors.bundesland ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        >
+                          <option value="">Bundesland auswählen...</option>
+                          {GERMAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        {fieldErrors.bundesland && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.bundesland}</p>}
                       </div>
 
                       <div className="space-y-1.5">
@@ -649,6 +735,7 @@ const Register: React.FC<RegisterProps> = ({
                           <option value="Zypern">Zypern</option>
                         </select>
                       </div>
+
                     </div>
                   )}
                 </div>

@@ -14,9 +14,10 @@ import {
   Globe,
   Loader2,
   AlertCircle,
-  FileText
+  FileText,
+  Briefcase
 } from 'lucide-react';
-import { EstimatedCapacity } from '../../types';
+import { EstimatedCapacity, GERMAN_STATES, SALUTATIONS } from '../../types';
 import {
   isValidEmail,
   isValidPhone,
@@ -28,162 +29,119 @@ import {
   ValidationErrors
 } from '../../utils/validation';
 
-/**
- * Props für das ProjektFormular
- */
 interface ProjektFormularProps {
   onBack: () => void;
   onSubmit: () => void;
   userCompanyId: string | null;
+  userId: string | null;
 }
 
-/**
- * Multi-Step Formular zum Erstellen eines neuen Projekts (Leads)
- * Schritt 1: Projekt (Details & Standort)
- * Schritt 2: Kunde (Unternehmen & Ansprechpartner)
- */
-const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, userCompanyId }) => {
+const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, userCompanyId, userId }) => {
   const [formStep, setFormStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  
-  // Zentraler State für alle Formularfelder
+
   const [formData, setFormData] = useState({
-    // Projekt-Infos (Schritt 1)
+    // Schritt 1: Projektdetails
     name: '',
     estimated_order_date: '',
     estimated_capacity: '' as EstimatedCapacity | '',
+    // Schritt 1: Projektstandort
     location_street: '',
     location_zip: '',
     location_city: '',
+    location_state: '' as typeof GERMAN_STATES[number] | '',
     location_country: 'Deutschland',
-    // Kunde-Infos (Schritt 2)
-    company_name: '',
-    website: '',
-    contact_fname: '',
-    contact_lname: '',
-    contact_email: '',
-    contact_phone: '',
+    // Schritt 2: Projektunternehmen
+    unternehmen_name: '',
+    unternehmen_website: '',
+    unternehmen_street: '',
+    unternehmen_zip: '',
+    unternehmen_city: '',
+    unternehmen_state: '' as typeof GERMAN_STATES[number] | '',
+    unternehmen_country: 'Deutschland',
+    // Schritt 2: Projektkontakt
+    kontakt_salutation: '' as typeof SALUTATIONS[number] | '',
+    kontakt_fname: '',
+    kontakt_lname: '',
+    kontakt_rolle_im_unternehmen: '',
+    kontakt_email: '',
+    kontakt_phone: '',
   });
 
-  // Validierungsfehler pro Feld
   const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({});
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
-  /**
-   * Validiert Schritt 1 (Projekt: Details & Standort)
-   */
   const validateStep1 = (): ValidationErrors => {
     const errors: ValidationErrors = {};
-    
-    if (!hasMinLength(formData.name, 3)) {
-      errors.name = 'Bitte geben Sie einen Projektnamen ein (min. 3 Zeichen)';
-    }
+    if (!hasMinLength(formData.name, 3)) errors.name = 'Bitte geben Sie einen Projektnamen ein (min. 3 Zeichen)';
     if (!formData.estimated_order_date) {
       errors.estimated_order_date = 'Bitte wählen Sie ein voraussichtliches Bestelldatum';
     } else if (!isDateInFuture(formData.estimated_order_date)) {
       errors.estimated_order_date = 'Das Datum muss in der Zukunft liegen';
     }
-    if (!formData.estimated_capacity) {
-      errors.estimated_capacity = 'Bitte wählen Sie eine voraussichtliche Kapazität';
-    }
-    if (!hasMinLength(formData.location_street, 3)) {
-      errors.location_street = 'Bitte geben Sie eine Straße ein (min. 3 Zeichen)';
-    }
-    if (!isValidZip(formData.location_zip)) {
-      errors.location_zip = 'Bitte geben Sie eine gültige PLZ ein (4-5 Ziffern)';
-    }
-    if (!hasMinLength(formData.location_city, 2)) {
-      errors.location_city = 'Bitte geben Sie eine Stadt ein (min. 2 Zeichen)';
-    }
-    if (!formData.location_country) {
-      errors.location_country = 'Bitte wählen Sie ein Land';
-    }
-    
+    if (!formData.estimated_capacity) errors.estimated_capacity = 'Bitte wählen Sie eine voraussichtliche Kapazität';
+    if (!hasMinLength(formData.location_street, 3)) errors.location_street = 'Bitte geben Sie eine Straße ein (min. 3 Zeichen)';
+    if (!isValidZip(formData.location_zip)) errors.location_zip = 'Bitte geben Sie eine gültige PLZ ein (4-5 Ziffern)';
+    if (!hasMinLength(formData.location_city, 2)) errors.location_city = 'Bitte geben Sie eine Stadt ein (min. 2 Zeichen)';
+    if (!formData.location_state) errors.location_state = 'Bitte wählen Sie ein Bundesland';
+    if (!formData.location_country) errors.location_country = 'Bitte wählen Sie ein Land';
     return errors;
   };
 
-  /**
-   * Validiert Schritt 2 (Kunde: Unternehmen & Ansprechpartner)
-   */
   const validateStep2 = (): ValidationErrors => {
     const errors: ValidationErrors = {};
-    
-    if (!hasMinLength(formData.company_name, 2)) {
-      errors.company_name = 'Bitte geben Sie einen Unternehmensnamen ein (min. 2 Zeichen)';
-    }
-    if (!isValidUrl(formData.website)) {
-      errors.website = 'Bitte geben Sie eine gültige URL ein (z.B. https://beispiel.de)';
-    }
-    if (!isValidName(formData.contact_fname)) {
-      errors.contact_fname = 'Bitte geben Sie einen gültigen Vornamen ein (min. 2 Zeichen)';
-    }
-    if (!isValidName(formData.contact_lname)) {
-      errors.contact_lname = 'Bitte geben Sie einen gültigen Nachnamen ein (min. 2 Zeichen)';
-    }
-    if (!isValidEmail(formData.contact_email)) {
-      errors.contact_email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
-    }
-    if (!isValidPhone(formData.contact_phone)) {
-      errors.contact_phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
-    }
-    
+    if (!hasMinLength(formData.unternehmen_name, 2)) errors.unternehmen_name = 'Bitte geben Sie einen Unternehmensnamen ein (min. 2 Zeichen)';
+    if (!hasMinLength(formData.unternehmen_street, 3)) errors.unternehmen_street = 'Bitte geben Sie eine Straße ein (min. 3 Zeichen)';
+    if (!isValidZip(formData.unternehmen_zip)) errors.unternehmen_zip = 'Bitte geben Sie eine gültige PLZ ein (4-5 Ziffern)';
+    if (!hasMinLength(formData.unternehmen_city, 2)) errors.unternehmen_city = 'Bitte geben Sie eine Stadt ein (min. 2 Zeichen)';
+    if (!formData.unternehmen_state) errors.unternehmen_state = 'Bitte wählen Sie ein Bundesland';
+    if (!formData.unternehmen_country) errors.unternehmen_country = 'Bitte wählen Sie ein Land';
+    if (!formData.kontakt_salutation) errors.kontakt_salutation = 'Bitte wählen Sie eine Anrede';
+    if (!isValidName(formData.kontakt_fname)) errors.kontakt_fname = 'Bitte geben Sie einen gültigen Vornamen ein (min. 2 Zeichen)';
+    if (!isValidName(formData.kontakt_lname)) errors.kontakt_lname = 'Bitte geben Sie einen gültigen Nachnamen ein (min. 2 Zeichen)';
+    if (!hasMinLength(formData.kontakt_rolle_im_unternehmen, 2)) errors.kontakt_rolle_im_unternehmen = 'Bitte geben Sie eine Rolle an (min. 2 Zeichen)';
+    if (!isValidEmail(formData.kontakt_email)) errors.kontakt_email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
+    if (!isValidPhone(formData.kontakt_phone)) errors.kontakt_phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
     return errors;
   };
 
-  /**
-   * Validiert ein einzelnes Feld (für onBlur)
-   */
   const validateField = (name: string, value: string): string | undefined => {
     switch (name) {
-      case 'name':
-        return hasMinLength(value, 3) ? undefined : 'Min. 3 Zeichen erforderlich';
+      case 'name': return hasMinLength(value, 3) ? undefined : 'Min. 3 Zeichen erforderlich';
       case 'estimated_order_date':
         if (!value) return 'Bitte Datum auswählen';
         return isDateInFuture(value) ? undefined : 'Datum muss in der Zukunft liegen';
-      case 'estimated_capacity':
-        return value ? undefined : 'Bitte Kapazität auswählen';
-      case 'location_street':
-        return hasMinLength(value, 3) ? undefined : 'Min. 3 Zeichen erforderlich';
-      case 'location_zip':
-        return isValidZip(value) ? undefined : 'PLZ: 4-5 Ziffern';
-      case 'location_city':
-        return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
-      case 'location_country':
-        return value ? undefined : 'Bitte Land auswählen';
-      case 'company_name':
-        return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
-      case 'website':
-        return isValidUrl(value) ? undefined : 'Ungültige URL (z.B. https://...)';
-      case 'contact_fname':
-        return isValidName(value) ? undefined : 'Ungültiger Vorname (min. 2 Zeichen)';
-      case 'contact_lname':
-        return isValidName(value) ? undefined : 'Ungültiger Nachname (min. 2 Zeichen)';
-      case 'contact_email':
-        return isValidEmail(value) ? undefined : 'Ungültige E-Mail-Adresse';
-      case 'contact_phone':
-        return isValidPhone(value) ? undefined : 'Ungültige Telefonnummer';
-      default:
-        return undefined;
+      case 'estimated_capacity': return value ? undefined : 'Bitte Kapazität auswählen';
+      case 'location_street': return hasMinLength(value, 3) ? undefined : 'Min. 3 Zeichen erforderlich';
+      case 'location_zip': return isValidZip(value) ? undefined : 'PLZ: 4-5 Ziffern';
+      case 'location_city': return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
+      case 'location_state': return value ? undefined : 'Bitte Bundesland auswählen';
+      case 'location_country': return value ? undefined : 'Bitte Land auswählen';
+      case 'unternehmen_name': return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
+      case 'unternehmen_street': return hasMinLength(value, 3) ? undefined : 'Min. 3 Zeichen erforderlich';
+      case 'unternehmen_zip': return isValidZip(value) ? undefined : 'PLZ: 4-5 Ziffern';
+      case 'unternehmen_city': return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
+      case 'unternehmen_state': return value ? undefined : 'Bitte Bundesland auswählen';
+      case 'unternehmen_country': return value ? undefined : 'Bitte Land auswählen';
+      case 'kontakt_salutation': return value ? undefined : 'Bitte Anrede auswählen';
+      case 'kontakt_fname': return isValidName(value) ? undefined : 'Ungültiger Vorname (min. 2 Zeichen)';
+      case 'kontakt_lname': return isValidName(value) ? undefined : 'Ungültiger Nachname (min. 2 Zeichen)';
+      case 'kontakt_rolle_im_unternehmen': return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
+      case 'kontakt_email': return isValidEmail(value) ? undefined : 'Ungültige E-Mail-Adresse';
+      case 'kontakt_phone': return isValidPhone(value) ? undefined : 'Ungültige Telefonnummer';
+      default: return undefined;
     }
   };
 
-  /**
-   * Generische Change-Handler Funktion für Inputs und Selects
-   */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Fehler sofort entfernen wenn Feld korrigiert wird
     if (touchedFields.has(name)) {
       const error = validateField(name, value);
       setFieldErrors(prev => ({ ...prev, [name]: error }));
     }
   };
 
-  /**
-   * onBlur-Handler für Validierung beim Verlassen eines Feldes
-   */
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setTouchedFields(prev => new Set(prev).add(name));
@@ -191,47 +149,59 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
     setFieldErrors(prev => ({ ...prev, [name]: error }));
   };
 
-  /**
-   * Behandelt den Weiter-Button mit Validierung
-   */
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (formStep === 1) {
       const errors = validateStep1();
-      const fieldsToTouch = ['name', 'estimated_order_date', 'estimated_capacity', 'location_street', 'location_zip', 'location_city', 'location_country'];
-      
+      const fields = ['name', 'estimated_order_date', 'estimated_capacity', 'location_street', 'location_zip', 'location_city', 'location_state', 'location_country'];
       if (Object.keys(errors).length > 0) {
         setFieldErrors(prev => ({ ...prev, ...errors }));
-        setTouchedFields(prev => new Set([...prev, ...fieldsToTouch]));
+        setTouchedFields(prev => new Set([...prev, ...fields]));
         return;
       }
       setFormStep(2);
     } else {
       const errors = validateStep2();
-      const fieldsToTouch = ['company_name', 'website', 'contact_fname', 'contact_lname', 'contact_email', 'contact_phone'];
-      
+      const fields = ['unternehmen_name', 'unternehmen_street', 'unternehmen_zip', 'unternehmen_city', 'unternehmen_state', 'unternehmen_country', 'kontakt_salutation', 'kontakt_fname', 'kontakt_lname', 'kontakt_rolle_im_unternehmen', 'kontakt_email', 'kontakt_phone'];
       if (Object.keys(errors).length > 0) {
         setFieldErrors(prev => ({ ...prev, ...errors }));
-        setTouchedFields(prev => new Set([...prev, ...fieldsToTouch]));
+        setTouchedFields(prev => new Set([...prev, ...fields]));
         return;
       }
       handleCreateProject();
     }
   };
 
-  /**
-   * Speichert das neue Projekt in der Supabase 'project' Tabelle
-   */
   const handleCreateProject = async () => {
     setLoading(true);
     try {
       const { error } = await supabase
         .from('project')
         .insert([{
-          ...formData,
-          status: 'Lead übergeben',
+          name: formData.name,
+          dealstage: 'Eingangsprüfung',
+          location_street: formData.location_street,
+          location_zip: formData.location_zip,
+          location_city: formData.location_city,
+          location_state: formData.location_state,
+          location_country: formData.location_country,
+          estimated_order_date: formData.estimated_order_date || null,
+          estimated_capacity: formData.estimated_capacity || null,
           company_id: userCompanyId,
+          created_by_user_id: userId,
+          unternehmen_name: formData.unternehmen_name,
+          unternehmen_website: formData.unternehmen_website || null,
+          unternehmen_street: formData.unternehmen_street,
+          unternehmen_zip: formData.unternehmen_zip,
+          unternehmen_city: formData.unternehmen_city,
+          unternehmen_state: formData.unternehmen_state,
+          unternehmen_country: formData.unternehmen_country,
+          kontakt_salutation: formData.kontakt_salutation,
+          kontakt_fname: formData.kontakt_fname,
+          kontakt_lname: formData.kontakt_lname,
+          kontakt_email: formData.kontakt_email,
+          kontakt_phone: formData.kontakt_phone,
+          kontakt_rolle_im_unternehmen: formData.kontakt_rolle_im_unternehmen,
         }]);
 
       if (error) throw error;
@@ -244,11 +214,93 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
     }
   };
 
+  const inputClass = (field: string) =>
+    `w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors[field] ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`;
+
+  const inputIconClass = (field: string) =>
+    `w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors[field] ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`;
+
+  const iconClass = (field: string) =>
+    `absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors[field] ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`;
+
+  const errMsg = (field: string) =>
+    fieldErrors[field] ? <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors[field]}</p> : null;
+
+  const label = (text: string, required = true) => (
+    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+      {text}{!required && <span className="text-slate-300 ml-1">(optional)</span>}
+    </label>
+  );
+
+  const sectionHeader = (Icon: React.ElementType, title: string, accent = false) => (
+    <div className="flex items-center gap-2.5 mb-1">
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${accent ? 'bg-[#82a8a4] text-white' : 'bg-slate-100 text-slate-500'}`}>
+        <Icon size={14} />
+      </div>
+      <h2 className="font-bold text-xs text-slate-700">{title}</h2>
+    </div>
+  );
+
+  const germanStateOptions = GERMAN_STATES.map(s => (
+    <option key={s} value={s}>{s}</option>
+  ));
+
+  const countryOptions = (
+    <>
+      <option value="">Land auswählen...</option>
+      <option value="Deutschland">Deutschland</option>
+      <option value="Österreich">Österreich</option>
+      <option value="Schweiz">Schweiz</option>
+      <option disabled>──────────</option>
+      <option value="Albanien">Albanien</option>
+      <option value="Andorra">Andorra</option>
+      <option value="Belgien">Belgien</option>
+      <option value="Bosnien und Herzegowina">Bosnien und Herzegowina</option>
+      <option value="Bulgarien">Bulgarien</option>
+      <option value="Dänemark">Dänemark</option>
+      <option value="Estland">Estland</option>
+      <option value="Finnland">Finnland</option>
+      <option value="Frankreich">Frankreich</option>
+      <option value="Griechenland">Griechenland</option>
+      <option value="Irland">Irland</option>
+      <option value="Island">Island</option>
+      <option value="Italien">Italien</option>
+      <option value="Kosovo">Kosovo</option>
+      <option value="Kroatien">Kroatien</option>
+      <option value="Lettland">Lettland</option>
+      <option value="Liechtenstein">Liechtenstein</option>
+      <option value="Litauen">Litauen</option>
+      <option value="Luxemburg">Luxemburg</option>
+      <option value="Malta">Malta</option>
+      <option value="Moldawien">Moldawien</option>
+      <option value="Monaco">Monaco</option>
+      <option value="Montenegro">Montenegro</option>
+      <option value="Niederlande">Niederlande</option>
+      <option value="Nordmazedonien">Nordmazedonien</option>
+      <option value="Norwegen">Norwegen</option>
+      <option value="Polen">Polen</option>
+      <option value="Portugal">Portugal</option>
+      <option value="Rumänien">Rumänien</option>
+      <option value="San Marino">San Marino</option>
+      <option value="Schweden">Schweden</option>
+      <option value="Serbien">Serbien</option>
+      <option value="Slowakei">Slowakei</option>
+      <option value="Slowenien">Slowenien</option>
+      <option value="Spanien">Spanien</option>
+      <option value="Tschechien">Tschechien</option>
+      <option value="Ukraine">Ukraine</option>
+      <option value="Ungarn">Ungarn</option>
+      <option value="Vatikanstadt">Vatikanstadt</option>
+      <option value="Vereinigtes Königreich">Vereinigtes Königreich</option>
+      <option value="Weißrussland">Weißrussland</option>
+      <option value="Zypern">Zypern</option>
+    </>
+  );
+
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <button 
+        <button
           onClick={onBack}
           className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors"
         >
@@ -256,10 +308,8 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
         </button>
       </div>
 
-      {/* Formular-Karte */}
       <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
         <div className="p-6 md:p-8">
-          {/* Progress-Balken */}
           <div className="flex gap-2 mb-8">
             {[1, 2].map(i => (
               <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-500 ${formStep >= i ? 'bg-[#82a8a4]' : 'bg-slate-100'}`} />
@@ -267,354 +317,414 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
           </div>
 
           <form onSubmit={handleNext} className="space-y-5">
-        
-            {/* SCHRITT 1: PROJEKT (Details & Standort) */}
-        {formStep === 1 && (
+
+            {/* SCHRITT 1: PROJEKT & STANDORT */}
+            {formStep === 1 && (
               <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-500">
+
                 {/* Projektdetails */}
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-7 h-7 rounded-lg bg-[#82a8a4] text-white flex items-center justify-center">
-                      <FileText size={14} />
-              </div>
-                    <h2 className="font-bold text-xs text-slate-700">Projektdetails</h2>
-            </div>
+                  {sectionHeader(FileText, 'Projektdetails', true)}
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Projektname</label>
-                <input 
-                  type="text" 
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
+                    {label('Projektname')}
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
                       onBlur={handleBlur}
-                  placeholder="z.B. Logistikzentrum Nord Erweiterung" 
-                      className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.name ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                      placeholder="z.B. Logistikzentrum Nord Erweiterung"
+                      className={inputClass('name')}
                     />
-                    {fieldErrors.name && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.name}</p>}
-          </div>
+                    {errMsg('name')}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Vorauss. Bestelldatum</label>
+                      {label('Vorauss. Bestelldatum')}
                       <div className="relative group">
-                        <CalendarClock className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.estimated_order_date ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                <input 
-                  type="date" 
-                  name="estimated_order_date"
-                  value={formData.estimated_order_date}
-                  onChange={handleChange}
+                        <CalendarClock className={iconClass('estimated_order_date')} size={14} />
+                        <input
+                          type="date"
+                          name="estimated_order_date"
+                          value={formData.estimated_order_date}
+                          onChange={handleChange}
                           onBlur={handleBlur}
                           min={new Date().toISOString().split('T')[0]}
-                          className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.estimated_order_date ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                />
-              </div>
-                      {fieldErrors.estimated_order_date && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.estimated_order_date}</p>}
+                          className={inputIconClass('estimated_order_date')}
+                        />
+                      </div>
+                      {errMsg('estimated_order_date')}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Vorauss. Kapazität</label>
+                      {label('Vorauss. Kapazität')}
                       <div className="relative group">
-                        <Zap className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none ${fieldErrors.estimated_capacity ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                  <select 
-                    name="estimated_capacity"
-                    value={formData.estimated_capacity}
-                    onChange={handleChange}
+                        <Zap className={`${iconClass('estimated_capacity')} pointer-events-none`} size={14} />
+                        <select
+                          name="estimated_capacity"
+                          value={formData.estimated_capacity}
+                          onChange={handleChange}
                           onBlur={handleBlur}
-                          className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 appearance-none cursor-pointer ${fieldErrors.estimated_capacity ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                  >
-                    <option value="">Kapazität wählen...</option>
-                    <option value="100 - 500 kWh">100 - 500 kWh</option>
-                    <option value="500 - 1000 kWh">500 - 1000 kWh</option>
-                    <option value="1000 - 5000 kWh">1000 - 5000 kWh</option>
-                    <option value=">5000 kWh">{'>5000 kWh'}</option>
-                  </select>
+                          className={`${inputIconClass('estimated_capacity')} appearance-none cursor-pointer`}
+                        >
+                          <option value="">Kapazität wählen...</option>
+                          <option value="100 - 500 kWh">100 - 500 kWh</option>
+                          <option value="500 - 1000 kWh">500 - 1000 kWh</option>
+                          <option value="1000 - 5000 kWh">1000 - 5000 kWh</option>
+                          <option value=">5000 kWh">{'>5000 kWh'}</option>
+                        </select>
                       </div>
-                      {fieldErrors.estimated_capacity && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.estimated_capacity}</p>}
+                      {errMsg('estimated_capacity')}
                     </div>
                   </div>
                 </div>
 
-                {/* Standort */}
+                {/* Projektstandort */}
                 <div className="space-y-4 pt-5 border-t border-slate-100">
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
-                      <MapPin size={14} />
-                    </div>
-                    <h2 className="font-bold text-xs text-slate-700">Standort</h2>
-                  </div>
+                  {sectionHeader(MapPin, 'Projektstandort')}
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Straße & Hausnummer</label>
+                    {label('Straße & Hausnummer')}
                     <div className="relative group">
-                      <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.location_street ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                      <input 
-                        type="text" 
+                      <MapPin className={iconClass('location_street')} size={14} />
+                      <input
+                        type="text"
                         name="location_street"
                         value={formData.location_street}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="z.B. Gewerbestraße 42" 
-                        className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.location_street ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        placeholder="z.B. Gewerbestraße 42"
+                        className={inputIconClass('location_street')}
                       />
                     </div>
-                    {fieldErrors.location_street && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.location_street}</p>}
+                    {errMsg('location_street')}
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">PLZ</label>
-                      <input 
-                        type="text" 
+                      {label('PLZ')}
+                      <input
+                        type="text"
                         name="location_zip"
                         value={formData.location_zip}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="10115" 
+                        placeholder="10115"
                         maxLength={5}
-                        className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.location_zip ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        className={inputClass('location_zip')}
                       />
-                      {fieldErrors.location_zip && <p className="text-[10px] text-red-500 font-medium flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.location_zip}</p>}
+                      {errMsg('location_zip')}
                     </div>
                     <div className="space-y-1.5 col-span-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Stadt</label>
-                      <input 
-                        type="text" 
+                      {label('Stadt')}
+                      <input
+                        type="text"
                         name="location_city"
                         value={formData.location_city}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="Berlin" 
-                        className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.location_city ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        placeholder="Berlin"
+                        className={inputClass('location_city')}
                       />
-                      {fieldErrors.location_city && <p className="text-[10px] text-red-500 font-medium flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.location_city}</p>}
+                      {errMsg('location_city')}
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Land</label>
-                    <select 
-                      name="location_country"
-                      value={formData.location_country}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 appearance-none cursor-pointer ${fieldErrors.location_country ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                    >
-                      <option value="">Land auswählen...</option>
-                      <option value="Deutschland">Deutschland</option>
-                      <option value="Österreich">Österreich</option>
-                      <option value="Schweiz">Schweiz</option>
-                      <option disabled>──────────</option>
-                      <option value="Albanien">Albanien</option>
-                      <option value="Andorra">Andorra</option>
-                      <option value="Belgien">Belgien</option>
-                      <option value="Bosnien und Herzegowina">Bosnien und Herzegowina</option>
-                      <option value="Bulgarien">Bulgarien</option>
-                      <option value="Dänemark">Dänemark</option>
-                      <option value="Estland">Estland</option>
-                      <option value="Finnland">Finnland</option>
-                      <option value="Frankreich">Frankreich</option>
-                      <option value="Griechenland">Griechenland</option>
-                      <option value="Irland">Irland</option>
-                      <option value="Island">Island</option>
-                      <option value="Italien">Italien</option>
-                      <option value="Kosovo">Kosovo</option>
-                      <option value="Kroatien">Kroatien</option>
-                      <option value="Lettland">Lettland</option>
-                      <option value="Liechtenstein">Liechtenstein</option>
-                      <option value="Litauen">Litauen</option>
-                      <option value="Luxemburg">Luxemburg</option>
-                      <option value="Malta">Malta</option>
-                      <option value="Moldawien">Moldawien</option>
-                      <option value="Monaco">Monaco</option>
-                      <option value="Montenegro">Montenegro</option>
-                      <option value="Niederlande">Niederlande</option>
-                      <option value="Nordmazedonien">Nordmazedonien</option>
-                      <option value="Norwegen">Norwegen</option>
-                      <option value="Polen">Polen</option>
-                      <option value="Portugal">Portugal</option>
-                      <option value="Rumänien">Rumänien</option>
-                      <option value="San Marino">San Marino</option>
-                      <option value="Schweden">Schweden</option>
-                      <option value="Serbien">Serbien</option>
-                      <option value="Slowakei">Slowakei</option>
-                      <option value="Slowenien">Slowenien</option>
-                      <option value="Spanien">Spanien</option>
-                      <option value="Tschechien">Tschechien</option>
-                      <option value="Ukraine">Ukraine</option>
-                      <option value="Ungarn">Ungarn</option>
-                      <option value="Vatikanstadt">Vatikanstadt</option>
-                      <option value="Vereinigtes Königreich">Vereinigtes Königreich</option>
-                      <option value="Weißrussland">Weißrussland</option>
-                      <option value="Zypern">Zypern</option>
-                    </select>
-                    {fieldErrors.location_country && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.location_country}</p>}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      {label('Bundesland')}
+                      <select
+                        name="location_state"
+                        value={formData.location_state}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className={`${inputClass('location_state')} appearance-none cursor-pointer`}
+                      >
+                        <option value="">Bundesland wählen...</option>
+                        {germanStateOptions}
+                      </select>
+                      {errMsg('location_state')}
+                    </div>
+                    <div className="space-y-1.5">
+                      {label('Land')}
+                      <select
+                        name="location_country"
+                        value={formData.location_country}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className={`${inputClass('location_country')} appearance-none cursor-pointer`}
+                      >
+                        {countryOptions}
+                      </select>
+                      {errMsg('location_country')}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* SCHRITT 2: KUNDE (Unternehmen & Ansprechpartner) */}
+            {/* SCHRITT 2: PROJEKTUNTERNEHMEN & PROJEKTKONTAKT */}
             {formStep === 2 && (
               <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-500">
-                {/* Unternehmen */}
+
+                {/* Projektunternehmen */}
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-7 h-7 rounded-lg bg-[#82a8a4] text-white flex items-center justify-center">
-                      <Building size={14} />
+                  {sectionHeader(Building, 'Projektunternehmen', true)}
+
+                  <div className="space-y-1.5">
+                    {label('Unternehmensname')}
+                    <div className="relative group">
+                      <Building className={iconClass('unternehmen_name')} size={14} />
+                      <input
+                        type="text"
+                        name="unternehmen_name"
+                        value={formData.unternehmen_name}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        placeholder="Muster GmbH"
+                        className={inputIconClass('unternehmen_name')}
+                      />
                     </div>
-                    <h2 className="font-bold text-xs text-slate-700">Unternehmen</h2>
+                    {errMsg('unternehmen_name')}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Unternehmensname</label>
+                    {label('Website', false)}
                     <div className="relative group">
-                      <Building className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.company_name ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                      <input 
-                        type="text" 
-                        name="company_name"
-                        value={formData.company_name}
+                      <Globe className={iconClass('unternehmen_website')} size={14} />
+                      <input
+                        type="text"
+                        name="unternehmen_website"
+                        value={formData.unternehmen_website}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="Muster GmbH" 
-                        className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.company_name ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        placeholder="https://www.unternehmen.de"
+                        className={inputIconClass('unternehmen_website')}
                       />
                     </div>
-                    {fieldErrors.company_name && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.company_name}</p>}
+                    {errMsg('unternehmen_website')}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Website</label>
+                    {label('Straße & Hausnummer')}
                     <div className="relative group">
-                      <Globe className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.website ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                      <input 
-                        type="text" 
-                        name="website"
-                        value={formData.website}
+                      <MapPin className={iconClass('unternehmen_street')} size={14} />
+                      <input
+                        type="text"
+                        name="unternehmen_street"
+                        value={formData.unternehmen_street}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="https://www.unternehmen.de" 
-                        className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.website ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
+                        placeholder="Musterstraße 1"
+                        className={inputIconClass('unternehmen_street')}
                       />
                     </div>
-                    {fieldErrors.website && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.website}</p>}
+                    {errMsg('unternehmen_street')}
                   </div>
-                </div>
 
-                {/* Ansprechpartner */}
-                <div className="space-y-4 pt-5 border-t border-slate-100">
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
-                      <User size={14} />
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      {label('PLZ')}
+                      <input
+                        type="text"
+                        name="unternehmen_zip"
+                        value={formData.unternehmen_zip}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        placeholder="10115"
+                        maxLength={5}
+                        className={inputClass('unternehmen_zip')}
+                      />
+                      {errMsg('unternehmen_zip')}
                     </div>
-                    <h2 className="font-bold text-xs text-slate-700">Ansprechpartner</h2>
+                    <div className="space-y-1.5 col-span-2">
+                      {label('Stadt')}
+                      <input
+                        type="text"
+                        name="unternehmen_city"
+                        value={formData.unternehmen_city}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        placeholder="Berlin"
+                        className={inputClass('unternehmen_city')}
+                      />
+                      {errMsg('unternehmen_city')}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Vorname</label>
-                      <div className="relative group">
-                        <User className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.contact_fname ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                  <input 
-                    type="text" 
-                    name="contact_fname"
-                    value={formData.contact_fname}
-                    onChange={handleChange}
-                          onBlur={handleBlur}
-                    placeholder="Max" 
-                          className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.contact_fname ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                  />
-                </div>
-                      {fieldErrors.contact_fname && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.contact_fname}</p>}
-              </div>
+                      {label('Bundesland')}
+                      <select
+                        name="unternehmen_state"
+                        value={formData.unternehmen_state}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className={`${inputClass('unternehmen_state')} appearance-none cursor-pointer`}
+                      >
+                        <option value="">Bundesland wählen...</option>
+                        {germanStateOptions}
+                      </select>
+                      {errMsg('unternehmen_state')}
+                    </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nachname</label>
+                      {label('Land')}
+                      <select
+                        name="unternehmen_country"
+                        value={formData.unternehmen_country}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className={`${inputClass('unternehmen_country')} appearance-none cursor-pointer`}
+                      >
+                        {countryOptions}
+                      </select>
+                      {errMsg('unternehmen_country')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Projektkontakt */}
+                <div className="space-y-4 pt-5 border-t border-slate-100">
+                  {sectionHeader(User, 'Projektkontakt')}
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      {label('Anrede')}
+                      <select
+                        name="kontakt_salutation"
+                        value={formData.kontakt_salutation}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        className={`${inputClass('kontakt_salutation')} appearance-none cursor-pointer`}
+                      >
+                        <option value="">Anrede...</option>
+                        {SALUTATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      {errMsg('kontakt_salutation')}
+                    </div>
+                    <div className="space-y-1.5">
+                      {label('Vorname')}
                       <div className="relative group">
-                        <User className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.contact_lname ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                  <input 
-                    type="text" 
-                    name="contact_lname"
-                    value={formData.contact_lname}
-                    onChange={handleChange}
+                        <User className={iconClass('kontakt_fname')} size={14} />
+                        <input
+                          type="text"
+                          name="kontakt_fname"
+                          value={formData.kontakt_fname}
+                          onChange={handleChange}
                           onBlur={handleBlur}
-                    placeholder="Mustermann" 
-                          className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.contact_lname ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                  />
+                          placeholder="Max"
+                          className={inputIconClass('kontakt_fname')}
+                        />
                       </div>
-                      {fieldErrors.contact_lname && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.contact_lname}</p>}
-                </div>
-              </div>
+                      {errMsg('kontakt_fname')}
+                    </div>
+                    <div className="space-y-1.5">
+                      {label('Nachname')}
+                      <div className="relative group">
+                        <User className={iconClass('kontakt_lname')} size={14} />
+                        <input
+                          type="text"
+                          name="kontakt_lname"
+                          value={formData.kontakt_lname}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          placeholder="Mustermann"
+                          className={inputIconClass('kontakt_lname')}
+                        />
+                      </div>
+                      {errMsg('kontakt_lname')}
+                    </div>
+                  </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">E-Mail</label>
+                    {label('Rolle im Unternehmen')}
                     <div className="relative group">
-                      <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.contact_email ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                  <input 
-                    type="email" 
-                    name="contact_email"
-                    value={formData.contact_email}
-                    onChange={handleChange}
+                      <Briefcase className={iconClass('kontakt_rolle_im_unternehmen')} size={14} />
+                      <input
+                        type="text"
+                        name="kontakt_rolle_im_unternehmen"
+                        value={formData.kontakt_rolle_im_unternehmen}
+                        onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="kontakt@unternehmen.de" 
-                        className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.contact_email ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                  />
-                </div>
-                    {fieldErrors.contact_email && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.contact_email}</p>}
-              </div>
+                        placeholder="z.B. Geschäftsführer, Einkaufsleiter"
+                        className={inputIconClass('kontakt_rolle_im_unternehmen')}
+                      />
+                    </div>
+                    {errMsg('kontakt_rolle_im_unternehmen')}
+                  </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Telefon</label>
+                    {label('E-Mail')}
                     <div className="relative group">
-                      <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.contact_phone ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                  <input 
-                    type="tel" 
-                    name="contact_phone"
-                    value={formData.contact_phone}
-                    onChange={handleChange}
+                      <Mail className={iconClass('kontakt_email')} size={14} />
+                      <input
+                        type="email"
+                        name="kontakt_email"
+                        value={formData.kontakt_email}
+                        onChange={handleChange}
                         onBlur={handleBlur}
-                        placeholder="+49 123 4567890" 
-                        className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.contact_phone ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`}
-                  />
-                </div>
-                    {fieldErrors.contact_phone && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.contact_phone}</p>}
-              </div>
-            </div>
-          </div>
-        )}
+                        placeholder="kontakt@unternehmen.de"
+                        className={inputIconClass('kontakt_email')}
+                      />
+                    </div>
+                    {errMsg('kontakt_email')}
+                  </div>
 
-            {/* Navigation-Buttons */}
+                  <div className="space-y-1.5">
+                    {label('Telefon')}
+                    <div className="relative group">
+                      <Phone className={iconClass('kontakt_phone')} size={14} />
+                      <input
+                        type="tel"
+                        name="kontakt_phone"
+                        value={formData.kontakt_phone}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        placeholder="+49 123 4567890"
+                        className={inputIconClass('kontakt_phone')}
+                      />
+                    </div>
+                    {errMsg('kontakt_phone')}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
             <div className="flex justify-between items-center pt-4">
               {formStep > 1 ? (
-          <button 
-                  type="button" 
-                  onClick={() => setFormStep(1)} 
+                <button
+                  type="button"
+                  onClick={() => setFormStep(1)}
                   className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors"
                 >
                   <ArrowLeft size={14} /> Zurück
-          </button>
+                </button>
               ) : (
                 <div></div>
               )}
-          
+
               {formStep === 1 ? (
-            <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="bg-[#82a8a4] hover:bg-[#72938f] text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-[#82a8a4]/20 flex items-center gap-1.5 text-xs transition-all active:scale-95"
-            >
+                >
                   Weiter <ArrowRight size={14} />
-            </button>
-          ) : (
-            <button 
-                  type="submit" 
-              disabled={loading}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg text-xs transition-all active:scale-95 disabled:opacity-70 flex items-center gap-1.5"
-            >
-              {loading ? (
-                    <>Wird gespeichert... <Loader2 className="animate-spin" size={14} /></>
+                </button>
               ) : (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg text-xs transition-all active:scale-95 disabled:opacity-70 flex items-center gap-1.5"
+                >
+                  {loading ? (
+                    <>Wird gespeichert... <Loader2 className="animate-spin" size={14} /></>
+                  ) : (
                     <>Projekt erstellen <CheckCircle2 size={14} /></>
+                  )}
+                </button>
               )}
-            </button>
-          )}
             </div>
           </form>
         </div>

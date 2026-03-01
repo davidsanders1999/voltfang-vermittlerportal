@@ -6,9 +6,9 @@ import { CheckCircle2, XCircle, Crown } from 'lucide-react';
  * Liste aller möglichen Projekt-Status in der korrekten Reihenfolge
  */
 export const ALL_PROJECT_STATUSES: ProjectStatus[] = [
-  'Lead übergeben',
+  'Eingangsprüfung',
   'Technische Klärung',
-  'Vertragliche Klärung',
+  'Angebotsklärung',
   'Closing',
   'Gewonnen',
   'Verloren',
@@ -24,12 +24,12 @@ export const PIPELINE_PHASES = ALL_PROJECT_STATUSES.slice(0, 5);
  * Einheitliches Voltfang-Grün Design für alle Status
  */
 export const STATUS_STYLES: Record<ProjectStatus, string> = {
+  'Eingangsprüfung': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
+  'Technische Klärung': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
+  'Angebotsklärung': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
+  'Closing': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
   'Gewonnen': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
   'Verloren': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
-  'Closing': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
-  'Technische Klärung': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
-  'Vertragliche Klärung': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
-  'Lead übergeben': 'bg-[#82a8a4]/10 text-[#5a7a76] border-[#82a8a4]/30',
 };
 
 /**

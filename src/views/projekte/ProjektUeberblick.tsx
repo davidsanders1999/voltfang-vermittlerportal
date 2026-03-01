@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, Plus, X, Briefcase, Trophy, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Plus, X, Briefcase, Trophy, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { Project, ProjectStatus } from '../../types';
 import { StatusBadge, ALL_PROJECT_STATUSES } from './ProjekteShared';
 
@@ -42,6 +42,43 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
   // State für die Multi-Status-Filterung innerhalb eines Reiters
   const [selectedStatuses, setSelectedStatuses] = useState<ProjectStatus[]>([]);
 
+  // State für die Ersteller-Filterung
+  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
+
+  // State für offene Dropdown-Filter
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'creator' | null>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const creatorDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node) &&
+        creatorDropdownRef.current && !creatorDropdownRef.current.contains(e.target as Node)
+      ) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleCreator = (id: string) => {
+    setSelectedCreators(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+    setCurrentPage(1);
+  };
+
+  const uniqueCreators = useMemo(() => {
+    const seen = new Set<string>();
+    return projects.filter(p => {
+      if (seen.has(p.created_by_user_id)) return false;
+      seen.add(p.created_by_user_id);
+      return true;
+    }).map(p => ({ id: p.created_by_user_id, ...p.creator }));
+  }, [projects]);
+
   // State für Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -51,9 +88,9 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
 
   // Zähler für die Tabs
   const counts = useMemo(() => ({
-    active: projects.filter(p => p.status !== 'Gewonnen' && p.status !== 'Verloren').length,
-    won: projects.filter(p => p.status === 'Gewonnen').length,
-    lost: projects.filter(p => p.status === 'Verloren').length,
+    active: projects.filter(p => p.dealstage !== 'Gewonnen' && p.dealstage !== 'Verloren').length,
+    won: projects.filter(p => p.dealstage === 'Gewonnen').length,
+    lost: projects.filter(p => p.dealstage === 'Verloren').length,
   }), [projects]);
 
   /**
@@ -73,9 +110,9 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
    */
   const projectsInTab = useMemo(() => {
     return projects.filter(p => {
-      if (activeTab === 'active') return p.status !== 'Gewonnen' && p.status !== 'Verloren';
-      if (activeTab === 'won') return p.status === 'Gewonnen';
-      if (activeTab === 'lost') return p.status === 'Verloren';
+      if (activeTab === 'active') return p.dealstage !== 'Gewonnen' && p.dealstage !== 'Verloren';
+      if (activeTab === 'won') return p.dealstage === 'Gewonnen';
+      if (activeTab === 'lost') return p.dealstage === 'Verloren';
       return true;
     });
   }, [projects, activeTab]);
@@ -94,11 +131,16 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
       // Filtern nach Status (falls Filter aktiv sind)
       const matchesStatus = 
         selectedStatuses.length === 0 || 
-        selectedStatuses.includes(project.status);
+        selectedStatuses.includes(project.dealstage);
 
-      return matchesSearch && matchesStatus;
+      // Filtern nach Ersteller
+      const matchesCreator =
+        selectedCreators.length === 0 ||
+        selectedCreators.includes(project.created_by_user_id);
+
+      return matchesSearch && matchesStatus && matchesCreator;
     });
-  }, [projectsInTab, searchTerm, selectedStatuses]);
+  }, [projectsInTab, searchTerm, selectedStatuses, selectedCreators]);
 
   /**
    * Hilfsfunktion zur numerischen Kapazitätsermittlung für Sortierung
@@ -119,9 +161,9 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
    * Status-Reihenfolge für Sortierung
    */
   const statusOrder: Record<ProjectStatus, number> = {
-    'Lead übergeben': 1,
+    'Eingangsprüfung': 1,
     'Technische Klärung': 2,
-    'Vertragliche Klärung': 3,
+    'Angebotsklärung': 3,
     'Closing': 4,
     'Gewonnen': 5,
     'Verloren': 6,
@@ -145,7 +187,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
           comparison = a.location_city.localeCompare(b.location_city, 'de');
           break;
         case 'status':
-          comparison = statusOrder[a.status] - statusOrder[b.status];
+          comparison = statusOrder[a.dealstage] - statusOrder[b.dealstage];
           break;
         case 'created_at':
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
@@ -197,6 +239,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setSelectedStatuses([]); // Filter beim Tab-Wechsel zurücksetzen
+    setSelectedCreators([]);
     setCurrentPage(1); // Seite zurücksetzen
   };
 
@@ -244,7 +287,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
       </div>
 
       {/* Kombinierte Filter-Box mit Tabs, Suche und Status-Filter */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
         {/* Tabs als obere Leiste */}
         <div className="flex items-center border-b border-slate-100">
           <button
@@ -307,54 +350,128 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
         </div>
 
         {/* Suchleiste und Filter */}
-        <div className="p-3 space-y-3">
+        <div className="p-3 flex gap-2 items-center">
           {/* Suchfeld */}
-          <div className="flex gap-2 items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-              <input 
-                type="text" 
-                placeholder={`${activeTab === 'active' ? 'Aktive Projekte' : activeTab === 'won' ? 'Gewonnene Deals' : 'Verlorene Projekte'} durchsuchen...`} 
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#82a8a4]/20 focus:border-[#82a8a4] transition-all"
-              />
-              {searchTerm && (
-                <button 
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={12} />
-                </button>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+            <input
+              type="text"
+              placeholder={`${activeTab === 'active' ? 'Aktive Projekte' : activeTab === 'won' ? 'Gewonnene Deals' : 'Verlorene Projekte'} durchsuchen...`}
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#82a8a4]/20 focus:border-[#82a8a4] transition-colors"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Status-Dropdown (nur bei aktiven Projekten) */}
+          {activeTab === 'active' && (
+            <div className="relative shrink-0" ref={statusDropdownRef}>
+              {selectedStatuses.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#82a8a4] text-white text-[8px] font-bold flex items-center justify-center z-10 pointer-events-none">
+                  {selectedStatuses.length}
+                </span>
+              )}
+              <button
+                onClick={() => setOpenDropdown(o => o === 'status' ? null : 'status')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${
+                  selectedStatuses.length > 0
+                    ? 'bg-[#82a8a4]/10 border-[#82a8a4]/30 text-[#5a7a76]'
+                    : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Status
+                <ChevronDown size={12} className={`transition-transform ${openDropdown === 'status' ? 'rotate-180' : ''}`} />
+              </button>
+
+              {openDropdown === 'status' && (
+                <div className="absolute top-full left-0 mt-1.5 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-50 min-w-[180px]">
+                  {ALL_PROJECT_STATUSES.filter(s => s !== 'Gewonnen' && s !== 'Verloren').map(status => (
+                    <button
+                      key={status}
+                      onClick={() => toggleStatus(status)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        selectedStatuses.includes(status)
+                          ? 'bg-[#82a8a4] border-[#82a8a4]'
+                          : 'border-slate-200'
+                      }`}>
+                        {selectedStatuses.includes(status) && <Check size={9} className="text-white" strokeWidth={3} />}
+                      </span>
+                      <span className="text-xs text-slate-700">{status}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-100 mt-1 pt-1 px-3">
+                    <button
+                      onClick={() => { setSelectedStatuses([]); setCurrentPage(1); }}
+                      className={`text-[10px] transition-colors py-1 ${selectedStatuses.length > 0 ? 'text-slate-400 hover:text-red-400' : 'invisible'}`}
+                    >
+                      Auswahl zurücksetzen
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-          
-          {/* Status-Filter (nur bei aktiven Projekten sichtbar) */}
-          {activeTab === 'active' && (
-            <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1">
-                <Filter size={10} />
-              </span>
-              {ALL_PROJECT_STATUSES
-                .filter(s => s !== 'Gewonnen' && s !== 'Verloren')
-                .map(status => (
-                  <StatusBadge 
-                    key={status} 
-                    status={status} 
-                    active={selectedStatuses.length === 0 || selectedStatuses.includes(status)}
-                    onClick={() => toggleStatus(status)}
-                  />
-                ))}
-              {/* Filter zurücksetzen (nur wenn Filter aktiv) */}
-              {selectedStatuses.length > 0 && (
-                <button 
-                  onClick={() => { setSelectedStatuses([]); setCurrentPage(1); }}
-                  className="flex items-center justify-center w-5 h-5 text-red-400 hover:text-red-500 bg-red-50 rounded-md transition-colors ml-1"
-                  title="Filter zurücksetzen"
-                >
-                  <X size={10} />
-                </button>
+          )}
+
+          {/* Ersteller-Dropdown (ab 2 verschiedenen Erstellern) */}
+          {uniqueCreators.length >= 2 && (
+            <div className="relative shrink-0" ref={creatorDropdownRef}>
+              {selectedCreators.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#82a8a4] text-white text-[8px] font-bold flex items-center justify-center z-10 pointer-events-none">
+                  {selectedCreators.length}
+                </span>
+              )}
+              <button
+                onClick={() => setOpenDropdown(o => o === 'creator' ? null : 'creator')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${
+                  selectedCreators.length > 0
+                    ? 'bg-[#82a8a4]/10 border-[#82a8a4]/30 text-[#5a7a76]'
+                    : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Ersteller
+                <ChevronDown size={12} className={`transition-transform ${openDropdown === 'creator' ? 'rotate-180' : ''}`} />
+              </button>
+
+              {openDropdown === 'creator' && (
+                <div className="absolute top-full right-0 mt-1.5 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-50 min-w-[180px]">
+                  {uniqueCreators.map(creator => (
+                    <button
+                      key={creator.id}
+                      onClick={() => toggleCreator(creator.id)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        selectedCreators.includes(creator.id)
+                          ? 'bg-[#82a8a4] border-[#82a8a4]'
+                          : 'border-slate-200'
+                      }`}>
+                        {selectedCreators.includes(creator.id) && <Check size={9} className="text-white" strokeWidth={3} />}
+                      </span>
+                      <span className="w-5 h-5 rounded-full bg-[#82a8a4]/15 text-[#5a7a76] flex items-center justify-center text-[8px] font-bold shrink-0">
+                        {creator.fname[0]}{creator.lname[0]}
+                      </span>
+                      <span className="text-xs text-slate-700">{creator.fname} {creator.lname}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-100 mt-1 pt-1 px-3">
+                    <button
+                      onClick={() => { setSelectedCreators([]); setCurrentPage(1); }}
+                      className={`text-[10px] transition-colors py-1 ${selectedCreators.length > 0 ? 'text-slate-400 hover:text-red-400' : 'invisible'}`}
+                    >
+                      Auswahl zurücksetzen
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -436,8 +553,13 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
                       }
                     </td>
                     <td className="px-5 py-3 text-xs font-medium text-slate-600 truncate">{project.location_city}</td>
-                    <td className="px-5 py-3"><StatusBadge status={project.status} /></td>
-                    <td className="px-5 py-3 text-xs font-medium text-slate-500">{formatDate(project.created_at)}</td>
+                    <td className="px-5 py-3"><StatusBadge status={project.dealstage} /></td>
+                    <td className="px-5 py-3">
+                      <p className="text-xs font-medium text-slate-500">{formatDate(project.created_at)}</p>
+                      <p className="text-[10px] text-slate-400 font-medium truncate">
+                        {project.creator.fname} {project.creator.lname}
+                      </p>
+                    </td>
                   </tr>
                 ))
               )}
