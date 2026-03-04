@@ -1,0 +1,522 @@
+{
+  "name": "Supabase Benutzerregistration -> HubSpot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "partnerportal/registration/supabase-v2",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        0
+      ],
+      "id": "e7e7df1e-01f0-4e03-b8f3-8e5c337f5b4f",
+      "name": "Webhook - Supabase User Created",
+      "webhookId": "partnerportal-registration-supabase-v2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "supabase_url",
+              "value": "https://efhgskqrvbqtxnmcebzt.supabase.co",
+              "type": "string"
+            },
+            {
+              "name": "user",
+              "value": "={{ $json.body.user }}",
+              "type": "object"
+            },
+            {
+              "name": "company",
+              "value": "={{ $json.body.company }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -736,
+        0
+      ],
+      "id": "5fdd0e9e-02ed-4a4e-8913-6d93b8b8f67e",
+      "name": "Normalize Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"properties\": {\n    \"email\": \"{{ $json.user.email }}\",\n    \"firstname\": \"{{ $json.user.fname }}\",\n    \"lastname\": \"{{ $json.user.lname }}\",\n    \"phone\": \"{{ $json.user.phone }}\",\n    \"salutation\": \"{{ $json.user.salutation }}\",\n    \"jobtitle\": \"{{ $json.user.rolle_im_unternehmen }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -512,
+        0
+      ],
+      "id": "f0f8faac-0d2d-4abc-bd27-f953dfdc0fc8",
+      "name": "HubSpot - Create Contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "REPLACE_ME",
+          "name": "HubSpot - Private App - Partnerportal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/2-20889509/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"limit\": 1,\n  \"query\": $json.company.name\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "1160f3d1-fe03-4a0f-80dc-099f1f664c6c",
+      "name": "HubSpot - Search Partner",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "REPLACE_ME",
+          "name": "HubSpot - Private App - Partnerportal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7cd9f31c-c6fc-43bf-8398-33fe0bf021cc",
+              "leftValue": "={{ $json.results }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        0
+      ],
+      "id": "d0fc4315-7997-40b0-8115-fd9d05348ce3",
+      "name": "Partner Exists?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "partner_id",
+              "value": "={{ $json.results[0].id }}",
+              "type": "string"
+            },
+            {
+              "name": "partner_hubspot_id",
+              "value": "={{ Number($json.results[0].id) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        -128
+      ],
+      "id": "95a654ea-d6e2-4e5f-809d-33647667470f",
+      "name": "Use Existing Partner"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/2-20889509",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"partnername\": $json.company.name,\n    \"webseite\": $json.company.website,\n    \"strasse_partner\": $json.company.street,\n    \"postleitzahl_partner\": $json.company.zip,\n    \"ort\": $json.company.city,\n    \"land\": $json.company.country,\n    \"bundesland\": $json.company.bundesland,\n    \"branche_partner\": $json.company.branche_partner,\n    \"e_mail_partner\": $json.user.email\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        128
+      ],
+      "id": "7ac3ce9b-fd8d-4f8d-8ca2-797c27e95eed",
+      "name": "HubSpot - Create Partner",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "REPLACE_ME",
+          "name": "HubSpot - Private App - Partnerportal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "partner_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "name": "partner_hubspot_id",
+              "value": "={{ Number($json.id) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        128
+      ],
+      "id": "be418219-c820-4b08-9975-351926788bb8",
+      "name": "Use New Partner"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "partner_id",
+              "field2": "partner_id"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        0
+      ],
+      "id": "f8935f29-8fe8-4435-92b7-2e40995aad95",
+      "name": "Merge Partner Data"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.hubapi.com/crm/v3/objects/2-20889509/{{ $json.partner_id }}/associations/contacts/{{ $('HubSpot - Create Contact').item.json.id }}/partner_to_contact",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "5934b74f-b113-4b58-a2f2-36449ca6644b",
+      "name": "HubSpot - Link Partner with Contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "REPLACE_ME",
+          "name": "HubSpot - Private App - Partnerportal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $json.supabase_url + '/rest/v1/user?id=eq.' + $json.user.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"hubspot_id\": Number($('HubSpot - Create Contact').item.json.id)\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        -96
+      ],
+      "id": "8e23d45a-5ff1-4260-bfda-08d44882600e",
+      "name": "Supabase - Update User HubSpot ID"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $json.supabase_url + '/rest/v1/usercompany?id=eq.' + $json.company.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"hubspot_id\": Number($json.partner_id)\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        96
+      ],
+      "id": "1133436a-ed77-4f8f-97ef-a31c4d5067fb",
+      "name": "Supabase - Update Company HubSpot IDs"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"user_id\": $json.user.id,\n  \"company_id\": $json.company.id,\n  \"hubspot_contact_id\": Number($('HubSpot - Create Contact').item.json.id),\n  \"hubspot_company_id\": Number($json.partner_id)\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "3f65d7f8-cb61-4510-a94a-7883497add80",
+      "name": "Respond Success"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Supabase User Created": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Create Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Create Contact": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Search Partner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Search Partner": {
+      "main": [
+        [
+          {
+            "node": "Partner Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Partner Exists?": {
+      "main": [
+        [
+          {
+            "node": "Use Existing Partner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HubSpot - Create Partner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Create Partner": {
+      "main": [
+        [
+          {
+            "node": "Use New Partner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Existing Partner": {
+      "main": [
+        [
+          {
+            "node": "Merge Partner Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use New Partner": {
+      "main": [
+        [
+          {
+            "node": "Merge Partner Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Partner Data": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Link Partner with Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Link Partner with Contact": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Update User HubSpot ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Update User HubSpot ID": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Update Company HubSpot IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Update Company HubSpot IDs": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "68f8c2ec-a30a-4218-95ff-64e3757e18d4",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "replace-after-import"
+  },
+  "id": "supabase-registration-hubspot-v2",
+  "tags": [
+    {
+      "name": "Supabase"
+    },
+    {
+      "name": "HubSpot"
+    },
+    {
+      "name": "n8n"
+    }
+  ]
+}

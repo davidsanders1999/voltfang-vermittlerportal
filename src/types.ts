@@ -83,7 +83,6 @@ export interface UserCompany {
   country: string;
   bundesland?: string;
   branche_partner: string;
-  hubspot_partner_id?: string;
   created_at: string;
 }
 

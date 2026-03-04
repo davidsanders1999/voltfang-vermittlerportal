@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
-import { Mail, Lock, Loader2, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
+import { Mail, Lock, Loader2, LogIn, ShieldCheck, UserPlus, Eye, EyeOff } from 'lucide-react';
 
 /**
  * Props für die Login-Komponente
@@ -19,6 +19,7 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotPassword, onEmailNotConfirmed }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,13 +101,21 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
                   <Lock size={14} />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4] outline-none font-bold text-xs text-slate-700 transition-all placeholder:text-slate-300"
+                  className="w-full pl-11 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4] outline-none font-bold text-xs text-slate-700 transition-all placeholder:text-slate-300"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
               </div>
             </div>
 

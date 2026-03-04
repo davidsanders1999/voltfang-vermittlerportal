@@ -101,7 +101,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
     if (!isValidName(formData.kontakt_lname)) errors.kontakt_lname = 'Bitte geben Sie einen gültigen Nachnamen ein (min. 2 Zeichen)';
     if (!hasMinLength(formData.kontakt_rolle_im_unternehmen, 2)) errors.kontakt_rolle_im_unternehmen = 'Bitte geben Sie eine Rolle an (min. 2 Zeichen)';
     if (!isValidEmail(formData.kontakt_email)) errors.kontakt_email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
-    if (!isValidPhone(formData.kontakt_phone)) errors.kontakt_phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
+    if (formData.kontakt_phone && !isValidPhone(formData.kontakt_phone)) errors.kontakt_phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
     return errors;
   };
 
@@ -128,7 +128,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
       case 'kontakt_lname': return isValidName(value) ? undefined : 'Ungültiger Nachname (min. 2 Zeichen)';
       case 'kontakt_rolle_im_unternehmen': return hasMinLength(value, 2) ? undefined : 'Min. 2 Zeichen erforderlich';
       case 'kontakt_email': return isValidEmail(value) ? undefined : 'Ungültige E-Mail-Adresse';
-      case 'kontakt_phone': return isValidPhone(value) ? undefined : 'Ungültige Telefonnummer';
+      case 'kontakt_phone': return !value || isValidPhone(value) ? undefined : 'Ungültige Telefonnummer';
       default: return undefined;
     }
   };
@@ -672,7 +672,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
                   </div>
 
                   <div className="space-y-1.5">
-                    {label('Telefon')}
+                    {label('Telefon', false)}
                     <div className="relative group">
                       <Phone className={iconClass('kontakt_phone')} size={14} />
                       <input

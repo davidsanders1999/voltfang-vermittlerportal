@@ -15,7 +15,9 @@ import {
   Ticket,
   Users,
   AlertCircle,
-  Briefcase
+  Briefcase,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import {
   isValidEmail,
@@ -75,6 +77,8 @@ const Register: React.FC<RegisterProps> = ({
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Einladungscode State
   const [inviteCode, setInviteCode] = useState(initialInviteCode || '');
@@ -86,6 +90,7 @@ const Register: React.FC<RegisterProps> = ({
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     salutation: '' as typeof SALUTATIONS[number] | '',
     fname: '',
     lname: '',
@@ -125,6 +130,7 @@ const Register: React.FC<RegisterProps> = ({
     if (!hasMinLength(formData.rolle_im_unternehmen, 2)) errors.rolle_im_unternehmen = 'Bitte geben Sie Ihre Rolle an (min. 2 Zeichen)';
     if (!isValidEmail(formData.email)) errors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
     if (!isValidPassword(formData.password)) errors.password = 'Mindestens 8 Zeichen und 1 Zahl erforderlich';
+    if (formData.confirmPassword !== formData.password) errors.confirmPassword = 'Passwörter stimmen nicht überein';
     if (formData.phone && !isValidPhone(formData.phone)) errors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
 
     return errors;
@@ -166,6 +172,8 @@ const Register: React.FC<RegisterProps> = ({
         return isValidEmail(value) ? undefined : 'Ungültige E-Mail-Adresse';
       case 'password':
         return isValidPassword(value) ? undefined : 'Min. 8 Zeichen und 1 Zahl';
+      case 'confirmPassword':
+        return value === formData.password ? undefined : 'Passwörter stimmen nicht überein';
       case 'phone':
         return !value || isValidPhone(value) ? undefined : 'Ungültige Telefonnummer';
       case 'companyName':
@@ -263,6 +271,12 @@ const Register: React.FC<RegisterProps> = ({
       const error = validateField(name, value);
       setFieldErrors(prev => ({ ...prev, [name]: error }));
     }
+
+    // Beim Ändern des Passworts auch die Wiederholung mitvalidieren.
+    if (name === 'password' && touchedFields.has('confirmPassword')) {
+      const confirmPasswordError = validateField('confirmPassword', formData.confirmPassword);
+      setFieldErrors(prev => ({ ...prev, confirmPassword: confirmPasswordError }));
+    }
   };
 
   /**
@@ -322,19 +336,15 @@ const Register: React.FC<RegisterProps> = ({
           p_phone: formData.phone,
           p_email: formData.email,
           p_invitation_code: inviteCode,
+          p_salutation: formData.salutation || null,
+          p_rolle_im_unternehmen: formData.rolle_im_unternehmen || null,
         });
 
         if (rpcError) throw rpcError;
-
-        // Salutation + Rolle in user-Tabelle nachpflegen
-        await supabase
-          .from('user')
-          .update({ salutation: formData.salutation || null, rolle_im_unternehmen: formData.rolle_im_unternehmen || null })
-          .eq('auth_id', authData.user.id);
       } else {
         // 2b. Normale Registrierung: Neues Unternehmen erstellen
-        // Hinweis: Die Supabase-RPC handle_new_partner_registration muss p_branche_partner und p_bundesland
-        // akzeptieren und beim INSERT in usercompany setzen (branche_partner ist NOT NULL).
+        // Hinweis: Die Supabase-RPC handle_new_partner_registration muss p_branche_partner, p_bundesland,
+        // p_salutation und p_rolle_im_unternehmen akzeptieren.
         const { error: rpcError } = await supabase.rpc('handle_new_partner_registration', {
           p_auth_id: authData.user.id,
           p_fname: formData.fname,
@@ -349,23 +359,11 @@ const Register: React.FC<RegisterProps> = ({
           p_email: formData.email,
           p_branche_partner: formData.branche_partner || null,
           p_bundesland: formData.bundesland || null,
+          p_salutation: formData.salutation || null,
+          p_rolle_im_unternehmen: formData.rolle_im_unternehmen || null,
         });
 
         if (rpcError) throw rpcError;
-
-        // Salutation + Rolle in user (Branche/Bundesland sind bereits in der RPC gesetzt)
-        const { data: userData } = await supabase
-          .from('user')
-          .select('id, company_id')
-          .eq('auth_id', authData.user.id)
-          .single();
-
-        if (userData) {
-          await supabase
-            .from('user')
-            .update({ salutation: formData.salutation || null, rolle_im_unternehmen: formData.rolle_im_unternehmen || null })
-            .eq('id', userData.id);
-        }
       }
 
       // Wichtig: User ausloggen, damit die Erfolgsseite angezeigt wird
@@ -380,7 +378,7 @@ const Register: React.FC<RegisterProps> = ({
         companyName: invitationInfo?.company_name || formData.companyName || undefined,
       });
     } catch (err: any) {
-      setError(err.message || 'Registrierung fehlgeschlagen.');
+      setError('Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.');
       console.error(err);
       // Bei Fehler: Status zurücksetzen, damit User es erneut versuchen kann
       onRegistrationError();
@@ -400,7 +398,7 @@ const Register: React.FC<RegisterProps> = ({
       const errors = validateStep1();
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        setTouchedFields(new Set(['salutation', 'fname', 'lname', 'rolle_im_unternehmen', 'email', 'password', 'phone']));
+        setTouchedFields(new Set(['salutation', 'fname', 'lname', 'rolle_im_unternehmen', 'email', 'password', 'confirmPassword', 'phone']));
         return;
       }
       setStep(2);
@@ -504,10 +502,34 @@ const Register: React.FC<RegisterProps> = ({
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Passwort</label>
                     <div className="relative group">
                       <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.password ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
-                      <input type="password" name="password" value={formData.password} onChange={handleChange} onBlur={handleBlur} placeholder="••••••••" className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.password ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`} />
+                      <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} onBlur={handleBlur} placeholder="••••••••" className={`w-full pl-11 pr-11 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.password ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`} />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(prev => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                        aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      >
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
                     </div>
                     {fieldErrors.password && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.password}</p>}
                     {!fieldErrors.password && <p className="text-[10px] text-slate-400 ml-1">Mindestens 8 Zeichen und 1 Zahl</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Passwort wiederholen</label>
+                    <div className="relative group">
+                      <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.confirmPassword ? 'text-red-400' : 'text-slate-400 group-focus-within:text-[#82a8a4]'}`} size={14} />
+                      <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} onBlur={handleBlur} placeholder="••••••••" className={`w-full pl-11 pr-11 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-bold text-xs text-slate-700 ${fieldErrors.confirmPassword ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'}`} />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(prev => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                        aria-label={showConfirmPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      >
+                        {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                    {fieldErrors.confirmPassword && <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1"><AlertCircle size={10} />{fieldErrors.confirmPassword}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Telefonnummer <span className="text-slate-300">(optional)</span></label>

@@ -37,6 +37,7 @@ const App: React.FC = () => {
   // Auth State Machine
   const [authStatus, setAuthStatus] = useState<AuthStatus>('initializing');
   const authStatusRef = useRef<AuthStatus>('initializing');
+  const registrationInProgressRef = useRef(false);
   
   // User-Daten
   const [userProfile, setUserProfile] = useState<User | null>(null);
@@ -85,7 +86,7 @@ const App: React.FC = () => {
     } = supabase.auth.onAuthStateChange((event, session) => {
       // WICHTIG: Während der Registrierung ALLE Auth-Events ignorieren!
       // Das verhindert das Flackern zum Dashboard
-      if (authStatusRef.current === 'registering' || authStatusRef.current === 'registration_done') {
+      if (registrationInProgressRef.current || authStatusRef.current === 'registration_done') {
         console.log('[Auth] Event ignoriert (Status:', authStatusRef.current, ')');
         return;
       }
@@ -448,16 +449,18 @@ const App: React.FC = () => {
           <Register 
             onBackToLogin={() => { setAuthView('login'); setInviteCode(undefined); }} 
             onRegistrationStart={() => {
-              // SOFORT den Status setzen - das verhindert jedes Flackern!
-              setAuthStatus('registering');
+              // Auth-Events während der Registrierung blockieren, ohne das Formular zu unmounten.
+              registrationInProgressRef.current = true;
             }}
             onRegisterSuccess={(data) => { 
+              registrationInProgressRef.current = false;
               setRegistrationData(data);
               setAuthStatus('registration_done'); 
               setInviteCode(undefined); 
             }}
             onRegistrationError={() => {
-              // Bei Fehler zurück zum Register-Formular
+              registrationInProgressRef.current = false;
+              // Bei Fehler auf dem Register-Formular bleiben
               setAuthStatus('unauthenticated');
             }}
             inviteCode={inviteCode}
