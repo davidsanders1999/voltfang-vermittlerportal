@@ -10,6 +10,7 @@ import Register from './views/Register';
 import ForgotPassword from './views/ForgotPassword';
 import ResetPassword from './views/ResetPassword';
 import { ViewType, User, UserCompany } from './types';
+import { getHubSpotUserContext } from './utils/hubspotProjectsApi';
 
 /**
  * Auth-Status State Machine
@@ -110,28 +111,18 @@ const App: React.FC = () => {
 
   const fetchUserData = async (authId: string) => {
     try {
-      const { data: userData, error: userError } = await supabase
-        .from('user')
-        .select('*')
-        .eq('auth_id', authId)
-        .single();
-
-      if (userError) throw userError;
-      setUserProfile(userData);
-
-      if (userData.company_id) {
-        const { data: companyData, error: companyError } = await supabase
-          .from('usercompany')
-          .select('*')
-          .eq('id', userData.company_id)
-          .single();
-
-        if (companyError) throw companyError;
-        setUserCompany(companyData);
+      const context = await getHubSpotUserContext();
+      if (!context?.user || context?.user?.id === undefined) {
+        throw new Error('User context missing');
+      }
+      if (context.user.auth_id && context.user.auth_id !== authId) {
+        throw new Error('User mismatch');
       }
 
-      // Auth-Status basierend auf is_unlocked setzen
-      if (userData.is_unlocked) {
+      setUserProfile(context.user as User);
+      setUserCompany((context.company ?? null) as UserCompany | null);
+
+      if (context.user.vermittlerportal_status === 'Aktiv') {
         setAuthStatus('authenticated');
       } else {
         setAuthStatus('pending_unlock');
@@ -476,17 +467,7 @@ const App: React.FC = () => {
             onForgotPassword={() => setAuthView('forgot-password')}
             onEmailNotConfirmed={async (email) => {
               setPendingEmail(email);
-              // Freischaltungs-Status aus der DB holen
-              try {
-                const { data } = await supabase
-                  .from('user')
-                  .select('is_unlocked')
-                  .eq('email', email)
-                  .single();
-                setPendingUserUnlocked(data?.is_unlocked ?? false);
-              } catch {
-                setPendingUserUnlocked(false);
-              }
+              setPendingUserUnlocked(false);
               setAuthStatus('email_not_confirmed');
             }}
           />

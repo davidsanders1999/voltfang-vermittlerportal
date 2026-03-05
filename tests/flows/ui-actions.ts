@@ -33,7 +33,8 @@ export function setupErrorLogging(page: Page, testTitle: string): void {
       url.includes('supabase.co') ||
       url.includes('/auth/v1/') ||
       url.includes('/rest/v1/') ||
-      url.includes('/rpc/');
+      url.includes('/rpc/') ||
+      url.includes('/functions/v1/');
 
     if (!isLikelyApiCall) return;
 

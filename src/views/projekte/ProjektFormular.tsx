@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { supabase } from '../../utils/supabase';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -28,6 +27,7 @@ import {
   isValidName,
   ValidationErrors
 } from '../../utils/validation';
+import { createHubSpotProject } from '../../utils/hubspotProjectsApi';
 
 interface ProjektFormularProps {
   onBack: () => void;
@@ -39,6 +39,7 @@ interface ProjektFormularProps {
 const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, userCompanyId, userId }) => {
   const [formStep, setFormStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     // Schritt 1: Projektdetails
@@ -174,41 +175,65 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
 
   const handleCreateProject = async () => {
     setLoading(true);
+    setSubmitError(null);
     try {
-      const { error } = await supabase
-        .from('project')
-        .insert([{
-          name: formData.name,
-          dealstage: 'Eingangsprüfung',
-          location_street: formData.location_street,
-          location_zip: formData.location_zip,
-          location_city: formData.location_city,
-          location_state: formData.location_state,
-          location_country: formData.location_country,
-          estimated_order_date: formData.estimated_order_date || null,
-          estimated_capacity: formData.estimated_capacity || null,
-          company_id: userCompanyId,
-          created_by_user_id: userId,
-          unternehmen_name: formData.unternehmen_name,
-          unternehmen_website: formData.unternehmen_website || null,
-          unternehmen_street: formData.unternehmen_street,
-          unternehmen_zip: formData.unternehmen_zip,
-          unternehmen_city: formData.unternehmen_city,
-          unternehmen_state: formData.unternehmen_state,
-          unternehmen_country: formData.unternehmen_country,
-          kontakt_salutation: formData.kontakt_salutation,
-          kontakt_fname: formData.kontakt_fname,
-          kontakt_lname: formData.kontakt_lname,
-          kontakt_email: formData.kontakt_email,
-          kontakt_phone: formData.kontakt_phone,
-          kontakt_rolle_im_unternehmen: formData.kontakt_rolle_im_unternehmen,
-        }]);
+      if (!userCompanyId || !userId) {
+        throw new Error('Benutzer- oder Unternehmenskontext fehlt.');
+      }
 
-      if (error) throw error;
+      await createHubSpotProject({
+        name: formData.name,
+        estimated_order_date: formData.estimated_order_date || undefined,
+        estimated_capacity: formData.estimated_capacity || undefined,
+        location_street: formData.location_street,
+        location_zip: formData.location_zip,
+        location_city: formData.location_city,
+        location_state: formData.location_state,
+        location_country: formData.location_country,
+        unternehmen_name: formData.unternehmen_name,
+        unternehmen_website: formData.unternehmen_website || undefined,
+        unternehmen_street: formData.unternehmen_street,
+        unternehmen_zip: formData.unternehmen_zip,
+        unternehmen_city: formData.unternehmen_city,
+        unternehmen_state: formData.unternehmen_state,
+        unternehmen_country: formData.unternehmen_country,
+        kontakt_salutation: formData.kontakt_salutation,
+        kontakt_fname: formData.kontakt_fname,
+        kontakt_lname: formData.kontakt_lname,
+        kontakt_email: formData.kontakt_email,
+        kontakt_phone: formData.kontakt_phone,
+        kontakt_rolle_im_unternehmen: formData.kontakt_rolle_im_unternehmen,
+      });
       onSubmit();
     } catch (error) {
       console.error('Fehler beim Erstellen des Projekts:', error);
-      alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.');
+      let message = 'Fehler beim Speichern. Bitte versuchen Sie es erneut.';
+      const maybeContext = (error as { context?: { text?: () => Promise<string> } })?.context;
+
+      if (maybeContext?.text) {
+        try {
+          const bodyText = await maybeContext.text();
+          const parsed = JSON.parse(bodyText) as { error?: string };
+          const backendError = parsed?.error;
+          if (backendError) {
+            const normalizedError = backendError.toLowerCase();
+            const looksLikeEmailValidationError =
+              normalizedError.includes('not a valid email') ||
+              normalizedError.includes('invalid email') ||
+              normalizedError.includes('email') && normalizedError.includes('valid');
+
+            if (looksLikeEmailValidationError) {
+              message = 'Die eingegebene E-Mail-Adresse ist ungültig. Bitte prüfen Sie die Schreibweise und geben Sie eine gültige E-Mail-Adresse ein.';
+            } else {
+              message = backendError;
+            }
+          }
+        } catch {
+          // Fallback auf allgemeine Fehlermeldung.
+        }
+      }
+
+      setSubmitError(message);
     } finally {
       setLoading(false);
     }
@@ -726,6 +751,13 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
                 </button>
               )}
             </div>
+
+            {submitError && (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <span>{submitError}</span>
+              </div>
+            )}
           </form>
         </div>
       </div>

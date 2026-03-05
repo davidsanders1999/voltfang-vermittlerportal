@@ -44,14 +44,51 @@ export const supabaseAdmin: SupabaseClient = createClient(
   }
 );
 
+async function findAuthUserByEmail(email: string): Promise<{ id: string; email?: string } | null> {
+  let page = 1;
+  while (page <= 10) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) {
+      console.error('Fehler beim Laden der Auth-User:', error);
+      return null;
+    }
+    const user = (data?.users || []).find(u => (u.email || '').toLowerCase() === email.toLowerCase());
+    if (user) return { id: user.id, email: user.email || undefined };
+    if (!data?.users?.length || data.users.length < 200) break;
+    page++;
+  }
+  return null;
+}
+
+async function findAuthUsersByPrefix(emailPrefix: string): Promise<Array<{ id: string; email?: string }>> {
+  const result: Array<{ id: string; email?: string }> = [];
+  let page = 1;
+  while (page <= 20) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) {
+      console.error('Fehler beim Laden der Auth-User:', error);
+      return result;
+    }
+    const users = data?.users || [];
+    result.push(
+      ...users
+        .filter(u => (u.email || '').startsWith(emailPrefix))
+        .map(u => ({ id: u.id, email: u.email || undefined }))
+    );
+    if (!users.length || users.length < 200) break;
+    page++;
+  }
+  return result;
+}
+
 /**
- * Holt den Einladungscode eines Unternehmens anhand des Namens
+ * Holt den Einladungscode eines Unternehmens anhand der ID
  */
-export async function getCompanyInviteCode(companyName: string): Promise<string | null> {
+export async function getCompanyInviteCode(companyId: string): Promise<string | null> {
   const { data, error } = await supabaseAdmin
     .from('usercompany')
     .select('invite_code')
-    .eq('name', companyName)
+    .eq('id', companyId)
     .single();
 
   if (error) {
@@ -66,10 +103,12 @@ export async function getCompanyInviteCode(companyName: string): Promise<string 
  * Holt die company_id eines Users anhand der E-Mail
  */
 export async function getUserCompanyId(email: string): Promise<string | null> {
+  const authUser = await findAuthUserByEmail(email);
+  if (!authUser) return null;
   const { data, error } = await supabaseAdmin
     .from('user')
     .select('company_id')
-    .eq('email', email)
+    .eq('auth_id', authUser.id)
     .single();
 
   if (error) {
@@ -85,15 +124,15 @@ export async function getUserCompanyId(email: string): Promise<string | null> {
  */
 export async function getUserByEmail(email: string): Promise<{
   id: string;
-  company_id: string;
-  fname: string;
-  lname: string;
-  email: string;
+  company_id: string | null;
+  auth_id: string;
 } | null> {
+  const authUser = await findAuthUserByEmail(email);
+  if (!authUser) return null;
   const { data, error } = await supabaseAdmin
     .from('user')
-    .select('id, company_id, fname, lname, email')
-    .eq('email', email)
+    .select('id, company_id, auth_id')
+    .eq('auth_id', authUser.id)
     .single();
 
   if (error) {
@@ -148,20 +187,14 @@ export async function countUsersInCompany(companyId: string): Promise<number> {
  * Ermöglicht E-Mail-Bestätigung in Produktion aktiv zu lassen, während Tests automatisch bestätigen
  */
 export async function confirmUserEmail(email: string): Promise<boolean> {
-  // Hole die auth_id aus unserer user-Tabelle
-  const { data: userData, error: userError } = await supabaseAdmin
-    .from('user')
-    .select('auth_id')
-    .eq('email', email)
-    .single();
-  
-  if (userError || !userData?.auth_id) {
-    console.error('Fehler beim Abrufen des Users für E-Mail-Bestätigung:', userError);
+  const authUser = await findAuthUserByEmail(email);
+  if (!authUser?.id) {
+    console.error('Fehler beim Abrufen des Auth-Users für E-Mail-Bestätigung:', email);
     return false;
   }
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(
-    userData.auth_id,
+    authUser.id,
     { email_confirm: true }
   );
 
@@ -179,17 +212,43 @@ export async function confirmUserEmail(email: string): Promise<boolean> {
  * Simuliert die Backend-Freischaltung durch Voltfang
  */
 export async function unlockUser(email: string): Promise<boolean> {
-  const { error } = await supabaseAdmin
-    .from('user')
-    .update({ is_unlocked: true })
-    .eq('email', email);
+  const authUser = await findAuthUserByEmail(email);
+  if (!authUser?.id) return false;
 
-  if (error) {
-    console.error('Fehler beim Freischalten des Users:', error);
+  const { data: userRow, error: userError } = await supabaseAdmin
+    .from('user')
+    .select('hubspot_id')
+    .eq('auth_id', authUser.id)
+    .single();
+  if (userError || !userRow?.hubspot_id) {
+    console.error('Fehler beim Laden der HubSpot-ID für Freischaltung:', userError);
     return false;
   }
-  
-  console.log(`User ${email} wurde freigeschaltet.`);
+
+  const token = process.env.HUBSPOT_ACCESS_TOKEN;
+  if (!token) {
+    console.warn('HUBSPOT_ACCESS_TOKEN fehlt, Freischaltung im Test kann nicht gesetzt werden.');
+    return false;
+  }
+
+  const response = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${userRow.hubspot_id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      properties: {
+        vermittlerportal_status: 'Aktiv',
+      },
+    }),
+  });
+  if (!response.ok) {
+    console.error('Fehler beim Setzen des HubSpot-Status:', await response.text());
+    return false;
+  }
+
+  console.log(`User ${email} wurde in HubSpot auf Aktiv gesetzt.`);
   return true;
 }
 
@@ -198,20 +257,47 @@ export async function unlockUser(email: string): Promise<boolean> {
  * ACHTUNG: Nur für Testumgebungen verwenden!
  */
 export async function cleanupTestData(emailPrefix: string): Promise<void> {
-  // Finde alle Test-User (inkl. auth_id für Auth-User-Löschung)
-  const { data: users } = await supabaseAdmin
-    .from('user')
-    .select('id, company_id, email, auth_id')
-    .like('email', `${emailPrefix}%`);
-
-  if (!users || users.length === 0) {
+  const authUsers = await findAuthUsersByPrefix(emailPrefix);
+  if (!authUsers.length) {
     console.log('Keine Test-Daten zum Bereinigen gefunden.');
     return;
   }
 
-  // Sammle einzigartige company_ids und auth_ids
-  const companyIds = [...new Set(users.map(u => u.company_id).filter(Boolean))];
-  const authIds = users.map(u => u.auth_id).filter(Boolean) as string[];
+  const authIds = authUsers.map(u => u.id);
+  const { data: users } = await supabaseAdmin
+    .from('user')
+    .select('id, company_id, auth_id, hubspot_id')
+    .in('auth_id', authIds);
+  const companyIds = [...new Set((users || []).map(u => u.company_id).filter(Boolean))];
+
+  // Sammle HubSpot-IDs für eine Prefix-bezogene Bereinigung.
+  const hubspotUserContactIds = new Set<number>();
+  for (const user of users || []) {
+    if (user.hubspot_id) hubspotUserContactIds.add(user.hubspot_id);
+  }
+
+  const { data: projectsForCleanup } = await supabaseAdmin
+    .from('project')
+    .select('hubspot_id, hubspot_project_contact_id, hubspot_project_company_id')
+    .in('company_id', companyIds.length ? companyIds : ['00000000-0000-0000-0000-000000000000']);
+
+  const hubspotDealIds = new Set<number>();
+  const hubspotProjectContactIds = new Set<number>();
+  const hubspotEndkundeIds = new Set<number>();
+  for (const project of projectsForCleanup || []) {
+    if (project.hubspot_id) hubspotDealIds.add(project.hubspot_id);
+    if (project.hubspot_project_contact_id) hubspotProjectContactIds.add(project.hubspot_project_contact_id);
+    if (project.hubspot_project_company_id) hubspotEndkundeIds.add(project.hubspot_project_company_id);
+  }
+
+  const { data: companiesForCleanup } = await supabaseAdmin
+    .from('usercompany')
+    .select('hubspot_id')
+    .in('id', companyIds.length ? companyIds : ['00000000-0000-0000-0000-000000000000']);
+  const hubspotPartnerIds = new Set<number>();
+  for (const company of companiesForCleanup || []) {
+    if (company.hubspot_id) hubspotPartnerIds.add(company.hubspot_id);
+  }
 
   // Lösche zuerst alle Projekte der Test-Unternehmen
   let projectsDeleted = 0;
@@ -233,7 +319,7 @@ export async function cleanupTestData(emailPrefix: string): Promise<void> {
   const { error: userError } = await supabaseAdmin
     .from('user')
     .delete()
-    .like('email', `${emailPrefix}%`);
+    .in('auth_id', authIds);
 
   if (userError) {
     console.error('Fehler beim Löschen der Test-User:', userError);
@@ -265,5 +351,194 @@ export async function cleanupTestData(emailPrefix: string): Promise<void> {
     }
   }
 
-  console.log(`Test-Daten bereinigt: ${users.length} User, ${authUsersDeleted} Auth-Users, ${projectsDeleted} Projekte gelöscht.`);
+  // HubSpot-Objekte für dieses Test-Prefix ebenfalls bereinigen (best effort).
+  // Reihenfolge: Deals -> Endkunden/Partner -> Kontakte
+  const token = process.env.HUBSPOT_ACCESS_TOKEN;
+  let hubspotDealsDeleted = 0;
+  let hubspotEndkundenDeleted = 0;
+  let hubspotPartnersDeleted = 0;
+  let hubspotContactsDeleted = 0;
+  if (!token) {
+    console.warn('HUBSPOT_ACCESS_TOKEN fehlt. HubSpot-Testdaten werden bei cleanupTestData nicht gelöscht.');
+  } else {
+    hubspotDealsDeleted = await deleteHubSpotObjectsByIds('deals', [...hubspotDealIds]);
+    hubspotEndkundenDeleted = await deleteHubSpotObjectsByIds(HUBSPOT_ENDKUNDE_OBJECT_TYPE, [...hubspotEndkundeIds]);
+    hubspotPartnersDeleted = await deleteHubSpotObjectsByIds(HUBSPOT_PARTNER_OBJECT_TYPE, [...hubspotPartnerIds]);
+    const contactIds = new Set<number>([...hubspotUserContactIds, ...hubspotProjectContactIds]);
+    hubspotContactsDeleted = await deleteHubSpotObjectsByIds('contacts', [...contactIds]);
+  }
+
+  console.log(
+    `Test-Daten bereinigt: ${(users || []).length} User, ${authUsersDeleted} Auth-Users, ${projectsDeleted} Projekte, ` +
+      `HubSpot Deals=${hubspotDealsDeleted}, Endkunden=${hubspotEndkundenDeleted}, Partner=${hubspotPartnersDeleted}, Kontakte=${hubspotContactsDeleted}`
+  );
+}
+
+/**
+ * Liefert alle Projekte eines Unternehmens inkl. HubSpot-Zuordnungs-IDs.
+ */
+export async function getProjectsWithHubSpotMappings(companyId: string): Promise<Array<{
+  id: string;
+  name: string;
+  hubspot_id: number | null;
+  hubspot_project_contact_id: number | null;
+  hubspot_project_company_id: number | null;
+}>> {
+  const { data, error } = await supabaseAdmin
+    .from('project')
+    .select('id, name, hubspot_id, hubspot_project_contact_id, hubspot_project_company_id')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Fehler beim Abrufen der Projekt-Mappings:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
+const HUBSPOT_ENDKUNDE_OBJECT_TYPE = process.env.HUBSPOT_ENDKUNDE_OBJECT_TYPE || '2-57928694';
+const HUBSPOT_PARTNER_OBJECT_TYPE = process.env.HUBSPOT_PARTNER_OBJECT_TYPE || '2-57928699';
+
+type HubSpotListResponse = {
+  results?: Array<{ id?: string }>;
+  paging?: { next?: { after?: string } };
+};
+
+async function hubspotRequest(path: string, init?: RequestInit): Promise<Response> {
+  const token = process.env.HUBSPOT_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error('HUBSPOT_ACCESS_TOKEN fehlt. Vollständige HubSpot-Bereinigung nicht möglich.');
+  }
+
+  const response = await fetch(`${HUBSPOT_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
+  return response;
+}
+
+async function listHubSpotObjectIds(objectType: string): Promise<string[]> {
+  const ids: string[] = [];
+  let after: string | undefined;
+  let pages = 0;
+
+  while (pages < 500) {
+    const query = new URLSearchParams({
+      limit: '100',
+      archived: 'false',
+    });
+    if (after) query.set('after', after);
+
+    const response = await hubspotRequest(`/crm/v3/objects/${objectType}?${query.toString()}`);
+    if (!response.ok) {
+      throw new Error(`HubSpot-Liste fehlgeschlagen (${objectType}): ${await response.text()}`);
+    }
+
+    const payload = (await response.json()) as HubSpotListResponse;
+    const batchIds = (payload.results || [])
+      .map(item => item.id)
+      .filter((id): id is string => Boolean(id));
+    ids.push(...batchIds);
+
+    const nextAfter = payload.paging?.next?.after;
+    if (!nextAfter) break;
+    after = nextAfter;
+    pages += 1;
+  }
+
+  return ids;
+}
+
+async function deleteHubSpotObjectsByType(objectType: string): Promise<number> {
+  const ids = await listHubSpotObjectIds(objectType);
+  let deleted = 0;
+
+  for (const id of ids) {
+    const response = await hubspotRequest(`/crm/v3/objects/${objectType}/${id}`, {
+      method: 'DELETE',
+    });
+    // Bereits gelöschte/fehlende Datensätze brechen den Cleanup nicht ab.
+    if (response.ok || response.status === 404) {
+      deleted += 1;
+      continue;
+    }
+    console.error(`Fehler beim Löschen von HubSpot-Objekt ${objectType}/${id}:`, await response.text());
+  }
+
+  return deleted;
+}
+
+async function deleteHubSpotObjectsByIds(objectType: string, ids: Array<string | number>): Promise<number> {
+  let deleted = 0;
+  for (const rawId of ids) {
+    const id = String(rawId);
+    if (!id) continue;
+    const response = await hubspotRequest(`/crm/v3/objects/${objectType}/${id}`, {
+      method: 'DELETE',
+    });
+    if (response.ok || response.status === 404) {
+      deleted += 1;
+      continue;
+    }
+    console.error(`Fehler beim Löschen von HubSpot-Objekt ${objectType}/${id}:`, await response.text());
+  }
+  return deleted;
+}
+
+/**
+ * VOLLSTÄNDIGER RESET für E2E:
+ * - Supabase: project, user, usercompany + auth.users
+ * - HubSpot: deals, contacts, Partner, Endkunde
+ *
+ * Sicherheitsgurt:
+ * Setze ALLOW_DESTRUCTIVE_E2E_RESET=true, um diese Funktion bewusst auszuführen.
+ */
+export async function cleanupAllHubSpotAndSupabaseData(): Promise<void> {
+  if (process.env.ALLOW_DESTRUCTIVE_E2E_RESET !== 'true') {
+    throw new Error(
+      'Destruktiver Reset blockiert. Setze ALLOW_DESTRUCTIVE_E2E_RESET=true, um den Full-Cleanup auszuführen.'
+    );
+  }
+
+  // 1) Supabase-Daten löschen (Mappings + Auth)
+  await supabaseAdmin.from('project').delete().not('id', 'is', null);
+  await supabaseAdmin.from('user').delete().not('id', 'is', null);
+  await supabaseAdmin.from('usercompany').delete().not('id', 'is', null);
+
+  let page = 1;
+  let deletedAuthUsers = 0;
+  while (page <= 50) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw error;
+    const users = data?.users || [];
+    if (!users.length) break;
+
+    for (const user of users) {
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+      if (deleteError) {
+        console.error(`Fehler beim Löschen Auth-User ${user.id}:`, deleteError);
+        continue;
+      }
+      deletedAuthUsers += 1;
+    }
+
+    if (users.length < 200) break;
+  }
+
+  // 2) HubSpot-Daten löschen (Reihenfolge erst Deals, dann Objekte/Kontakte)
+  const deletedDeals = await deleteHubSpotObjectsByType('deals');
+  const deletedEndkunden = await deleteHubSpotObjectsByType(HUBSPOT_ENDKUNDE_OBJECT_TYPE);
+  const deletedPartners = await deleteHubSpotObjectsByType(HUBSPOT_PARTNER_OBJECT_TYPE);
+  const deletedContacts = await deleteHubSpotObjectsByType('contacts');
+
+  console.log(
+    `Full-Cleanup abgeschlossen: Auth-Users=${deletedAuthUsers}, Deals=${deletedDeals}, Endkunden=${deletedEndkunden}, Partner=${deletedPartners}, Kontakte=${deletedContacts}`
+  );
 }

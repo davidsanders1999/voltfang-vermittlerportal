@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase';
 import { Project, User } from '../types';
 import ProjektUeberblick from './projekte/ProjektUeberblick';
 import ProjektFormular from './projekte/ProjektFormular';
 import ProjektDetail from './projekte/ProjektDetail';
+import { getHubSpotContext } from '../utils/hubspotProjectsApi';
 
 /**
  * Schnittstelle für die Projekte-Komponente
@@ -39,17 +39,12 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('project')
-        .select('*, creator:created_by_user_id(fname, lname)')
-        .eq('company_id', userProfile.company_id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProjects(data || []);
+      const context = await getHubSpotContext();
+      const data = context?.projects || [];
+      setProjects(data);
       
       // Logik für Deep-Linking (falls initialProjectId vorhanden)
-      if (initialProjectId && data) {
+      if (initialProjectId) {
         const project = data.find(p => p.id === initialProjectId);
         if (project) {
           setSelectedProject(project);

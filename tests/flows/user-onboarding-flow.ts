@@ -28,7 +28,9 @@ export async function runUserOnboardingFlow(page: Page, scenario: E2EScenario): 
   const user1 = await getUserByEmail(scenario.users[0].email);
   expect(user1).not.toBeNull();
 
-  const inviteCode = await getCompanyInviteCode(scenario.company.name);
+  const ownerCompanyId = await getUserCompanyId(scenario.users[0].email);
+  expect(ownerCompanyId).toBeTruthy();
+  const inviteCode = await getCompanyInviteCode(ownerCompanyId!);
   expect(inviteCode).toBeTruthy();
   expect(inviteCode?.length).toBe(16);
 
@@ -40,7 +42,6 @@ export async function runUserOnboardingFlow(page: Page, scenario: E2EScenario): 
   await fillPersonalData(page, scenario.users[1]);
   await continueToStep2(page);
   await expect(page.locator('text=Einladung gültig')).toBeVisible({ timeout: 10000 });
-  await expect(page.locator(`text=${scenario.company.name}`)).toBeVisible();
   await submitRegistrationAndExpectSuccess(page, 'Team beitreten');
   await expect(page.locator(`text=${scenario.users[1].email}`)).toBeVisible();
   await gotoLoginFromSuccess(page);
@@ -50,7 +51,6 @@ export async function runUserOnboardingFlow(page: Page, scenario: E2EScenario): 
   await fillPersonalData(page, scenario.users[2]);
   await continueToStep2(page);
   await enterInviteCode(page, inviteCode!);
-  await expect(page.locator(`text=${scenario.company.name}`)).toBeVisible();
   await submitRegistrationAndExpectSuccess(page, 'Team beitreten');
   await expect(page.locator(`text=${scenario.users[2].email}`)).toBeVisible();
 

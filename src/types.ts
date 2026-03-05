@@ -66,8 +66,11 @@ export interface Project {
   created_at: string;
   company_id?: string;
   hubspot_id?: number;
+  hubspot_project_contact_id?: number;
+  hubspot_project_company_id?: number;
   vf_contact_name?: string;
   created_by_user_id: string;
+  company_name?: string;
   creator: { fname: string; lname: string };
 }
 
@@ -75,21 +78,24 @@ export type ViewType = 'dashboard' | 'projekte' | 'academy' | 'profile';
 
 export interface UserCompany {
   id: string;
-  name: string;
+  name?: string;
   website?: string;
-  street: string;
-  zip: string;
-  city: string;
-  country: string;
+  street?: string;
+  zip?: string;
+  city?: string;
+  country?: string;
   bundesland?: string;
-  branche_partner: string;
+  branche_partner?: string;
+  invite_code?: string;
+  hubspot_id?: number;
   created_at: string;
 }
 
 export interface User {
   id: string;
-  auth_id: string;
+  auth_id?: string;
   company_id?: string;
+  hubspot_id?: number;
   fname: string;
   lname: string;
   salutation?: string;
@@ -97,5 +103,6 @@ export interface User {
   email?: string;
   phone?: string;
   created_at: string;
-  is_unlocked: boolean;
+  vermittlerportal_status?: 'Freischaltung ausstehend' | 'Aktiv';
+  is_unlocked?: boolean;
 }

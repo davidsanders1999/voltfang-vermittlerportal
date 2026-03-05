@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase';
 import { 
   Building, 
   User as UserIcon, 
@@ -18,6 +17,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { User, UserCompany } from '../types';
+import { getHubSpotUserContext } from '../utils/hubspotProjectsApi';
 
 interface TeamMember {
   id: string;
@@ -26,6 +26,7 @@ interface TeamMember {
   email?: string;
   created_at: string;
   is_unlocked: boolean;
+  vermittlerportal_status?: string;
 }
 
 /**
@@ -69,6 +70,7 @@ const Avatar = ({ fname, lname, isCurrentUser = false }: { fname: string; lname:
  * Profil-Ansicht zum Anzeigen und Bearbeiten der Nutzer- und Unternehmensdaten
  */
 const Profile: React.FC = () => {
+  const EDITING_ENABLED = false;
   const [profile, setProfile] = useState<User | null>(null);
   const [company, setCompany] = useState<(UserCompany & { invite_code?: string }) | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -89,41 +91,10 @@ const Profile: React.FC = () => {
   const fetchProfileData = async () => {
     setLoading(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      const { data: userData, error: userError } = await supabase
-        .from('user')
-        .select('*')
-        .eq('auth_id', authUser.id)
-        .single();
-
-      if (userError) throw userError;
-      
-      const extendedProfile = { ...userData, email: authUser.email };
-      setProfile(extendedProfile);
-
-      if (userData.company_id) {
-        // Unternehmensdaten laden
-        const { data: companyData, error: companyError } = await supabase
-          .from('usercompany')
-          .select('*')
-          .eq('id', userData.company_id)
-          .single();
-
-        if (companyError) throw companyError;
-        setCompany(companyData);
-
-        // Teammitglieder laden
-        const { data: teamData, error: teamError } = await supabase
-          .from('user')
-          .select('id, fname, lname, email, created_at, is_unlocked')
-          .eq('company_id', userData.company_id)
-          .order('created_at', { ascending: true });
-
-        if (teamError) throw teamError;
-        setTeamMembers(teamData || []);
-      }
+      const context = await getHubSpotUserContext();
+      setProfile((context?.user ?? null) as User | null);
+      setCompany((context?.company ?? null) as (UserCompany & { invite_code?: string }) | null);
+      setTeamMembers((context?.team_members ?? []) as TeamMember[]);
     } catch (error) {
       console.error('Fehler beim Laden des Profils:', error);
       setError('Profil konnte nicht geladen werden.');
@@ -152,6 +123,10 @@ const Profile: React.FC = () => {
   };
 
   const handleStartEditing = () => {
+    if (!EDITING_ENABLED) {
+      setError('Profilbearbeitung ist aktuell deaktiviert. Daten werden aus HubSpot gelesen.');
+      return;
+    }
     if (profile) {
       setEditedProfile({
         fname: profile.fname,
@@ -175,6 +150,10 @@ const Profile: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!EDITING_ENABLED) {
+      setError('Profilbearbeitung ist aktuell deaktiviert. Daten werden aus HubSpot gelesen.');
+      return;
+    }
     if (!profile) return;
     
     setSaving(true);
@@ -273,7 +252,7 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             </div>
-            {isEditing ? (
+            {isEditing && EDITING_ENABLED ? (
               <div className="flex gap-3 animate-in fade-in zoom-in duration-300">
                 <button
                   onClick={() => setIsEditing(false)}
@@ -499,7 +478,7 @@ const Profile: React.FC = () => {
                     {member.id === profile.id && (
                       <span className="text-[9px] font-bold text-[#82a8a4] bg-[#82a8a4]/10 px-1.5 py-0.5 rounded">Du</span>
                     )}
-                    {!member.is_unlocked && (
+                  {!member.is_unlocked && (
                       <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Freischaltung ausstehend</span>
                     )}
                   </div>
@@ -565,7 +544,9 @@ const Profile: React.FC = () => {
              <div className="w-px h-8 bg-slate-200 hidden sm:block"></div>
              <div>
                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Status</p>
-               <p className="text-xs font-bold text-green-600">Aktiv</p>
+               <p className={`text-xs font-bold ${profile.vermittlerportal_status === 'Aktiv' ? 'text-green-600' : 'text-amber-600'}`}>
+                 {profile.vermittlerportal_status || 'Freischaltung ausstehend'}
+               </p>
              </div>
           </div>
         </div>

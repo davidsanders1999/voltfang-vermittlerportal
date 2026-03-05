@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../utils/supabase';
 import { 
   TrendingUp, 
   Zap, 
@@ -29,6 +28,7 @@ import {
 } from 'recharts';
 import { ViewType, Project, User, UserCompany } from '../types';
 import { StatusBadge } from './projekte/ProjekteShared';
+import { getHubSpotContext } from '../utils/hubspotProjectsApi';
 
 /**
  * Schnittstelle für die Dashboard-Props
@@ -92,14 +92,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       
       setLoading(true);
       try {
-        const { data: projectsData, error: projectsError } = await supabase
-          .from('project')
-          .select('*')
-          .eq('company_id', userProfile.company_id)
-          .order('created_at', { ascending: false });
-
-        if (projectsError) throw projectsError;
-        setProjects(projectsData || []);
+        const context = await getHubSpotContext();
+        setProjects(context?.projects || []);
 
       } catch (error) {
         console.error('Fehler beim Laden der Dashboard-Daten:', error);

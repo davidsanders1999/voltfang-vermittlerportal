@@ -29,6 +29,8 @@ Es gibt jetzt 3 Ebenen:
    Kleine, gezielte End-to-End-Tests:
    - `users.atomic.spec.ts` -> erstellt 3 Nutzer
    - `projects.atomic.spec.ts` -> legt 1 Projekt pro Nutzerprofil an (also 3)
+   - `three-users-three-projects.atomic.spec.ts` -> grosser Gesamtlauf (3 Nutzer + 3 Projekte)
+   - `full-reset-hubspot-supabase.atomic.spec.ts` -> destruktiver Voll-Reset in HubSpot + Supabase
 
 3. **Full Suite**  
    Ein uebergeordneter Test (`registration-flow.spec.ts`), der beide Atomic-Flows
@@ -86,10 +88,12 @@ cd /Users/davidsanders/Documents/GitHub/voltfang-vermittler-portal-v2
 
 - Nur Nutzeranlage:
   - `./node_modules/.bin/playwright test tests/atomic/users.atomic.spec.ts`
-- Ein einzelner Nutzer (ohne Cleanup, manuelle DB-Bereinigung):
-  - `./node_modules/.bin/playwright test tests/atomic/user-single-no-cleanup.atomic.spec.ts`
 - Nur Projektanlage:
   - `./node_modules/.bin/playwright test tests/atomic/projects.atomic.spec.ts`
+- Grosser 3-User/3-Projekt-Lauf:
+  - `./node_modules/.bin/playwright test tests/atomic/three-users-three-projects.atomic.spec.ts`
+- Vollständiger Reset (destruktiv, nur bewusst nutzen):
+  - `ALLOW_DESTRUCTIVE_E2E_RESET=true ./node_modules/.bin/playwright test tests/atomic/full-reset-hubspot-supabase.atomic.spec.ts`
 
 ### Full Suite
 
@@ -102,8 +106,10 @@ cd /Users/davidsanders/Documents/GitHub/voltfang-vermittler-portal-v2
   - `./node_modules/.bin/playwright test --grep @atomic-users`
 - `@atomic-projects`:
   - `./node_modules/.bin/playwright test --grep @atomic-projects`
-- `@atomic-user-single`:
-  - `./node_modules/.bin/playwright test --grep @atomic-user-single`
+- `@atomic-3users-3projects`:
+  - `./node_modules/.bin/playwright test --grep @atomic-3users-3projects`
+- `@atomic-full-reset`:
+  - `ALLOW_DESTRUCTIVE_E2E_RESET=true ./node_modules/.bin/playwright test --grep @atomic-full-reset`
 - `@full-suite`:
   - `./node_modules/.bin/playwright test --grep @full-suite`
 

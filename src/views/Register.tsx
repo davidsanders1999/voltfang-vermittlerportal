@@ -30,6 +30,7 @@ import {
   ValidationErrors
 } from '../utils/validation';
 import { GERMAN_STATES, SALUTATIONS } from '../types';
+import { joinHubSpotPartnerWithInvite, registerHubSpotPartner } from '../utils/hubspotProjectsApi';
 
 /**
  * Daten für die Registrierungs-Erfolgsseite
@@ -328,42 +329,36 @@ const Register: React.FC<RegisterProps> = ({
       if (!authData.user) throw new Error('Registrierung fehlgeschlagen.');
 
       if (invitationInfo && inviteCode) {
-        // 2a. Bei Einladung: Bestehendem Unternehmen beitreten
-        const { error: rpcError } = await supabase.rpc('join_company_with_invitation', {
-          p_auth_id: authData.user.id,
-          p_fname: formData.fname,
-          p_lname: formData.lname,
-          p_phone: formData.phone,
-          p_email: formData.email,
-          p_invitation_code: inviteCode,
-          p_salutation: formData.salutation || null,
-          p_rolle_im_unternehmen: formData.rolle_im_unternehmen || null,
+        // 2a. Bei Einladung: über Edge Function Kontakt + Mapping anlegen
+        await joinHubSpotPartnerWithInvite({
+          auth_id: authData.user.id,
+          email: formData.email,
+          salutation: formData.salutation,
+          fname: formData.fname,
+          lname: formData.lname,
+          rolle_im_unternehmen: formData.rolle_im_unternehmen,
+          phone: formData.phone || undefined,
+          invitation_code: inviteCode,
         });
-
-        if (rpcError) throw rpcError;
       } else {
-        // 2b. Normale Registrierung: Neues Unternehmen erstellen
-        // Hinweis: Die Supabase-RPC handle_new_partner_registration muss p_branche_partner, p_bundesland,
-        // p_salutation und p_rolle_im_unternehmen akzeptieren.
-        const { error: rpcError } = await supabase.rpc('handle_new_partner_registration', {
-          p_auth_id: authData.user.id,
-          p_fname: formData.fname,
-          p_lname: formData.lname,
-          p_phone: formData.phone,
-          p_company_name: formData.companyName,
-          p_website: formData.website,
-          p_street: formData.street,
-          p_zip: formData.zip,
-          p_city: formData.city,
-          p_country: formData.country,
-          p_email: formData.email,
-          p_branche_partner: formData.branche_partner || null,
-          p_bundesland: formData.bundesland || null,
-          p_salutation: formData.salutation || null,
-          p_rolle_im_unternehmen: formData.rolle_im_unternehmen || null,
+        // 2b. Normale Registrierung: Partner + Kontakt via Edge Function
+        await registerHubSpotPartner({
+          auth_id: authData.user.id,
+          email: formData.email,
+          salutation: formData.salutation,
+          fname: formData.fname,
+          lname: formData.lname,
+          rolle_im_unternehmen: formData.rolle_im_unternehmen,
+          phone: formData.phone || undefined,
+          company_name: formData.companyName,
+          website: formData.website || undefined,
+          street: formData.street,
+          zip: formData.zip,
+          city: formData.city,
+          bundesland: formData.bundesland,
+          country: formData.country,
+          branche_partner: formData.branche_partner,
         });
-
-        if (rpcError) throw rpcError;
       }
 
       // Wichtig: User ausloggen, damit die Erfolgsseite angezeigt wird

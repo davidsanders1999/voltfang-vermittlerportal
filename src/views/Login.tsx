@@ -44,12 +44,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onForgotP
     } catch (err: any) {
       // Prüfe ob E-Mail nicht bestätigt wurde
       if (err.message?.toLowerCase().includes('email not confirmed')) {
+        setLoading(false);
         onEmailNotConfirmed(email);
         return;
       }
       // Fehlermeldung für den User aufbereiten
       setError(err.message || 'Login fehlgeschlagen. Bitte prüfen Sie Ihre Daten.');
-    } finally {
       setLoading(false);
     }
   };

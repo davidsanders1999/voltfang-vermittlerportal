@@ -125,7 +125,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
       // Suche über Name, Kunde und Stadt
       const matchesSearch = 
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (project.company_name || project.unternehmen_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.location_city.toLowerCase().includes(searchTerm.toLowerCase());
       
       // Filtern nach Status (falls Filter aktiv sind)
@@ -542,7 +542,7 @@ const ProjektUeberblick: React.FC<ProjektUeberblickProps> = ({
                   >
                     <td className="px-5 py-3">
                       <p className="text-xs font-bold text-slate-800 group-hover:text-[#82a8a4] transition-colors truncate">{project.name}</p>
-                      <p className="text-[10px] text-slate-400 font-medium truncate">{project.company_name}</p>
+                      <p className="text-[10px] text-slate-400 font-medium truncate">{project.company_name || project.unternehmen_name}</p>
                     </td>
                     <td className="px-5 py-3 text-xs font-bold text-slate-700">
                       {project.offered_capacity 
