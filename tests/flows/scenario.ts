@@ -21,6 +21,7 @@ export interface CompanySeed {
 
 export interface ProjectSeed {
   name: string;
+  description: string;
   estimated_order_date: string;
   estimated_capacity: string;
   location_street: string;
@@ -60,7 +61,7 @@ export function createScenario(prefix: string): E2EScenario {
     users: [
       {
         email: `${emailPrefix}.owner@${domain}`,
-        password: 'TestPasswort123!',
+        password: '123456789',
         salutation: 'Herr',
         fname: 'Max',
         lname: 'Mustermann',
@@ -69,7 +70,7 @@ export function createScenario(prefix: string): E2EScenario {
       },
       {
         email: `${emailPrefix}.member@${domain}`,
-        password: 'TestPasswort456!',
+        password: '123456789',
         salutation: 'Frau',
         fname: 'Erika',
         lname: 'Musterfrau',
@@ -78,7 +79,7 @@ export function createScenario(prefix: string): E2EScenario {
       },
       {
         email: `${emailPrefix}.manual@${domain}`,
-        password: 'TestPasswort789!',
+        password: '123456789',
         salutation: 'Herr',
         fname: 'Hans',
         lname: 'Hansen',
@@ -99,6 +100,7 @@ export function createScenario(prefix: string): E2EScenario {
     projects: [
       {
         name: `E2E Projekt Alpha ${timestamp}`,
+        description: `E2E Zusatzinfo Alpha ${timestamp}: Zugang nur nach Ruecksprache mit dem Betreiber.`,
         estimated_order_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         estimated_capacity: '500 - 1000 kWh',
         location_street: 'Alphastrasse 1',
@@ -120,6 +122,7 @@ export function createScenario(prefix: string): E2EScenario {
       },
       {
         name: `E2E Projekt Beta ${timestamp}`,
+        description: `E2E Zusatzinfo Beta ${timestamp}: Netzanschlusspruefung laeuft.`,
         estimated_order_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         estimated_capacity: '1000 - 5000 kWh',
         location_street: 'Betaweg 42',
@@ -141,6 +144,7 @@ export function createScenario(prefix: string): E2EScenario {
       },
       {
         name: `E2E Projekt Gamma ${timestamp}`,
+        description: `E2E Zusatzinfo Gamma ${timestamp}: Lastprofil vom Endkunden folgt.`,
         estimated_order_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         estimated_capacity: '100 - 500 kWh',
         location_street: 'Gammagasse 7',

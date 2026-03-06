@@ -44,6 +44,7 @@ const PERSISTENT_COMPANY: CompanySeed = {
 function createPersistentProjectSeed(timestamp: number): ProjectSeed {
   return {
     name: `E2E Persistent Projekt ${timestamp}`,
+    description: `E2E Zusatzinfo Persistent ${timestamp}: Bitte Zufahrt und Kranfenster vorab abstimmen.`,
     estimated_order_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     estimated_capacity: '500 - 1000 kWh',
     location_street: 'Projektstrasse 1',

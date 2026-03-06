@@ -216,12 +216,23 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                   </div>
                   <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Ansprechpartner (Voltfang)</h3>
                 </div>
-                <div className="pl-10">
+                <div className="pl-10 space-y-4">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Name</span>
                     <span className="text-xs font-bold text-slate-700">
                       {project.vf_contact_name || 'Wird intern vergeben...'}
                     </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase mb-1">Kontakt</span>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                        <Mail size={14} className="text-[#82a8a4]/50" /> {project.vf_contact_email || 'Keine Angabe'}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                        <Phone size={14} className="text-[#82a8a4]/50" /> {project.vf_contact_phone || 'Keine Angabe'}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -255,6 +266,12 @@ const ProjektDetail: React.FC<ProjektDetailProps> = ({ project, onBack }) => {
                           ? <span className="text-slate-500">{project.estimated_capacity} <span className="text-[10px] text-slate-400">(vorläufig)</span></span>
                           : 'Keine Angabe'
                       }
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Sonstige Projektinformationen</span>
+                    <p className="text-xs font-medium text-slate-700 whitespace-pre-wrap break-words">
+                      {project.description?.trim() || 'Keine Angabe'}
                     </p>
                   </div>
                 </div>

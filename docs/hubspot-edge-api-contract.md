@@ -19,6 +19,8 @@ eingehenden User-Token intern ueber `supabase.auth.getUser()`.
 Diese Zuordnung wird zentral in `HUBSPOT_FIELDS` in der Edge Function gepflegt.
 
 - `payload.name` -> Deal.`dealname`
+- `payload.description` -> Deal.`description` (optionaler Freitext)
+- `Deal.hubspot_owner_id` -> API `vf_contact_name`, `vf_contact_email`, `vf_contact_phone` (Owner-Mapping in Edge Function)
 - `Eingangspruefung (Default)` -> Deal.`dealstage` = `141674304`
 - `payload.estimated_order_date` -> Deal.`voraussichtliches_bestelldatum`
 - `payload.estimated_capacity` -> Deal.`geschatzte_speichergro_e`
@@ -106,6 +108,10 @@ Alle Requests verwenden:
     {
       "id": "uuid",
       "name": "Projektname",
+      "description": "Freitext",
+      "vf_contact_name": "Roman Alberti",
+      "vf_contact_email": "roman.alberti@voltfang.de",
+      "vf_contact_phone": "+49 123 4567890",
       "dealstage": "Eingangspruefung",
       "location_street": "string",
       "location_zip": "string",
@@ -152,6 +158,7 @@ Alle Requests verwenden:
   "action": "create_project",
   "payload": {
     "name": "string",
+    "description": "string",
     "estimated_order_date": "YYYY-MM-DD",
     "estimated_capacity": "string",
     "location_street": "string",

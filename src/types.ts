@@ -37,6 +37,7 @@ export const SALUTATIONS = ['Herr', 'Frau', 'divers', 'Herr Dr.', 'Frau Dr.'] as
 export interface Project {
   id: string;
   name: string;
+  description?: string;
   dealstage: ProjectStatus;
   // Projektstandort
   location_street: string;
@@ -69,6 +70,8 @@ export interface Project {
   hubspot_project_contact_id?: number;
   hubspot_project_company_id?: number;
   vf_contact_name?: string;
+  vf_contact_email?: string;
+  vf_contact_phone?: string;
   created_by_user_id: string;
   company_name?: string;
   creator: { fname: string; lname: string };

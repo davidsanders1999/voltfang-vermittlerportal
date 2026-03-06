@@ -98,6 +98,7 @@ export async function enterInviteCode(page: Page, inviteCode: string): Promise<v
   const inviteInput = page.locator('input[placeholder*="ABCD1234"]');
   await expect(inviteInput).toBeVisible();
   await inviteInput.fill(inviteCode);
+  await page.getByRole('button', { name: 'Einladungscode prüfen' }).click();
   await expect(page.locator('text=Einladung gültig')).toBeVisible({ timeout: 10000 });
 }
 
@@ -142,6 +143,7 @@ export async function createProject(page: Page, project: ProjectSeed): Promise<v
   await expect(page.locator('h2:has-text("Projektdetails")')).toBeVisible({ timeout: 5000 });
 
   await page.locator('input[name="name"]').fill(project.name);
+  await page.locator('textarea[name="description"]').fill(project.description);
   await page.locator('input[name="estimated_order_date"]').fill(project.estimated_order_date);
   await page.locator('select[name="estimated_capacity"]').selectOption(project.estimated_capacity);
   await page.locator('input[name="location_street"]').fill(project.location_street);

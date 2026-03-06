@@ -216,9 +216,12 @@ const Register: React.FC<RegisterProps> = ({
   /**
    * Validiert einen Einladungscode
    */
-  const validateInviteCode = async (code: string) => {
+  const validateInviteCode = async (code: string, showLengthError = false) => {
     if (!code || code.length < 16) {
       setInvitationInfo(null);
+      if (showLengthError) {
+        setCodeError('Bitte geben Sie einen 16-stelligen Einladungscode ein.');
+      }
       return;
     }
 
@@ -297,13 +300,14 @@ const Register: React.FC<RegisterProps> = ({
     const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     setInviteCode(value);
     setCodeError(null);
-    
-    // Auto-Validierung bei 16 Zeichen
-    if (value.length === 16) {
-      validateInviteCode(value);
-    } else {
-      setInvitationInfo(null);
-    }
+    setInvitationInfo(null);
+  };
+
+  /**
+   * Prüft den Einladungscode per Klick auf den kleinen Prüf-Button.
+   */
+  const handleValidateInviteCode = async () => {
+    await validateInviteCode(inviteCode, true);
   };
 
   /**
@@ -584,16 +588,28 @@ const Register: React.FC<RegisterProps> = ({
                             onChange={handleInviteCodeChange}
                             placeholder="z.B. ABCD1234EFGH5678" 
                             maxLength={16}
-                            className={`w-full pl-11 pr-11 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4] outline-none font-mono text-xs tracking-wider uppercase ${
-                              codeError ? 'border-red-300' : 'border-slate-200'
+                            className={`w-full pl-11 pr-28 py-2.5 bg-slate-50 border rounded-xl focus:ring-4 outline-none font-mono text-xs tracking-wider uppercase ${
+                              codeError ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : 'border-slate-200 focus:ring-[#82a8a4]/10 focus:border-[#82a8a4]'
                             }`}
                           />
+                          <button
+                            type="button"
+                            onClick={handleValidateInviteCode}
+                            disabled={validatingCode || inviteCode.length < 16}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            aria-label="Einladungscode prüfen"
+                          >
+                            Prüfen
+                          </button>
                           {validatingCode && (
-                            <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" size={14} />
+                            <Loader2 className="absolute right-20 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" size={14} />
                           )}
                         </div>
                         {codeError && (
-                          <p className="text-[10px] text-red-500 font-medium ml-1">{codeError}</p>
+                          <p className="text-[10px] text-red-500 font-medium ml-1 flex items-center gap-1">
+                            <AlertCircle size={10} />
+                            {codeError}
+                          </p>
                         )}
                         <p className="text-[10px] text-slate-400 ml-1">
                           Haben Sie einen Einladungscode? Geben Sie ihn hier ein, um einem bestehenden Team beizutreten.

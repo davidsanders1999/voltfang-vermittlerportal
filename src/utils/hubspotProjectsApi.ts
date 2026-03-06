@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 
 export type EdgeProjectPayload = {
   name: string;
+  description?: string;
   estimated_order_date?: string;
   estimated_capacity?: string;
   location_street: string;

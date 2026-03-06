@@ -1,6 +1,7 @@
 import { expect, Page } from '@playwright/test';
 import type { E2EScenario } from './scenario';
 import { createProject, login, logout, openProjects } from './ui-actions';
+import { openProjectDetail } from './navigation-actions';
 import { getProjectsWithHubSpotMappings, getUserCompanyId } from '../utils/supabase-admin';
 
 export async function runProjectCreationFlow(page: Page, scenario: E2EScenario): Promise<void> {
@@ -20,6 +21,13 @@ export async function runProjectCreationFlow(page: Page, scenario: E2EScenario):
 
   for (const project of scenario.projects) {
     await expect(page.locator(`text=${project.name}`)).toBeVisible({ timeout: 10000 });
+
+    // Neue Description-Logik: Zusatzinfos muessen in der Detailansicht sichtbar sein.
+    await openProjectDetail(page, project.name);
+    await expect(page.locator('text=Sonstige Projektinformationen')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`text=${project.description}`)).toBeVisible({ timeout: 10000 });
+    await page.locator('button:has-text("Zurück zur Übersicht")').click();
+    await expect(page.locator('h1:has-text("Projektverwaltung")')).toBeVisible({ timeout: 10000 });
   }
 
   // Verifiziere, dass pro Projekt alle 3 HubSpot-Zuordnungen persistiert wurden.

@@ -44,6 +44,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
   const [formData, setFormData] = useState({
     // Schritt 1: Projektdetails
     name: '',
+    description: '',
     estimated_order_date: '',
     estimated_capacity: '' as EstimatedCapacity | '',
     // Schritt 1: Projektstandort
@@ -134,7 +135,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     if (touchedFields.has(name)) {
@@ -143,7 +144,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
     }
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setTouchedFields(prev => new Set(prev).add(name));
     const error = validateField(name, value);
@@ -183,6 +184,7 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
 
       await createHubSpotProject({
         name: formData.name,
+        description: formData.description.trim() || undefined,
         estimated_order_date: formData.estimated_order_date || undefined,
         estimated_capacity: formData.estimated_capacity || undefined,
         location_street: formData.location_street,
@@ -401,6 +403,26 @@ const ProjektFormular: React.FC<ProjektFormularProps> = ({ onBack, onSubmit, use
                         </select>
                       </div>
                       {errMsg('estimated_capacity')}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {label('Sonstige Projektinformationen', false)}
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      rows={4}
+                      maxLength={2000}
+                      placeholder="Optionale Zusatzinfos zum Projekt (z.B. Besonderheiten, Hinweise, technische Randbedingungen)"
+                      className={`${inputClass('description')} resize-y min-h-[96px]`}
+                    />
+                    <div className="flex justify-between items-center">
+                      {errMsg('description')}
+                      <span className="text-[10px] text-slate-400 ml-auto">
+                        {formData.description.length}/2000
+                      </span>
                     </div>
                   </div>
                 </div>

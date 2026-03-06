@@ -1,7 +1,7 @@
 import { test } from '@playwright/test';
 import { runProjectCreationFlow } from '../flows/project-creation-flow';
 import { createScenario } from '../flows/scenario';
-import { cleanupScenario, runUserOnboardingFlow } from '../flows/user-onboarding-flow';
+import { runUserOnboardingFlow } from '../flows/user-onboarding-flow';
 import { setupErrorLogging } from '../flows/ui-actions';
 
 const scenario = createScenario('e2eatomic.3users-3projects');
@@ -9,10 +9,6 @@ const scenario = createScenario('e2eatomic.3users-3projects');
 test.describe('@atomic-3users-3projects Drei Nutzer + drei Projekte (End-to-End)', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     setupErrorLogging(page, testInfo.title);
-  });
-
-  test.afterAll(async () => {
-    await cleanupScenario(scenario);
   });
 
   test('@atomic-3users-3projects registriert 3 Nutzer und legt für jeden ein Projekt an', async ({ page }) => {

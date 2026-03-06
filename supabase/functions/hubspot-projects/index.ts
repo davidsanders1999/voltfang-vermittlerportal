@@ -19,6 +19,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 type ProjectPayload = {
   name: string;
+  description?: string;
   estimated_order_date?: string;
   estimated_capacity?: string;
   location_street: string;
@@ -107,6 +108,7 @@ const HUBSPOT_FIELDS = {
   deal: {
     stage: "dealstage",
     name: "dealname",
+    ownerId: "hubspot_owner_id",
     estimatedOrderDate: "voraussichtliches_bestelldatum",
     estimatedCapacity: "geschatzte_speichergro_e",
     offeredCapacity: "speicherkapazitat__kwh___angebot_",
@@ -179,6 +181,22 @@ const HUBSPOT_STAGE_TO_PROJECT_STATUS: Record<string, string> = {
   "247783800": "Verloren",
   "141674310": "Verloren",
   "145716270": "Verloren",
+};
+
+type VoltfangContactInfo = {
+  name: string;
+  email?: string;
+  phone?: string;
+};
+
+// Kurzfristiges Owner-Mapping fuer eine saubere Anzeige im Portal.
+// Kann spaeter auf HubSpot Owners API umgestellt werden.
+const HUBSPOT_OWNER_ID_TO_CONTACT: Record<string, VoltfangContactInfo> = {
+  "12355261": {
+    name: "Roman Alberti",
+    email: "roman.alberti@voltfang.de", // Mock-Daten laut Anforderung
+    phone: "+49 123 4567890", // Mock-Daten laut Anforderung
+  },
 };
 
 const corsHeaders = {
@@ -273,8 +291,9 @@ async function ensureAuthUserExists(authId: string) {
   return data.user;
 }
 
-// In "description" wird bei Anlage ein JSON-Payload abgelegt.
-// Beim Lesen nutzen wir es als Fallback, falls einzelne HubSpot-Felder fehlen.
+// Legacy-Fallback:
+// In frueheren Versionen wurde in "description" ein JSON-Payload abgelegt.
+// Beim Lesen nutzen wir dieses alte Format weiter als Fallback.
 function parseEmbeddedDescription(description: string | undefined) {
   if (!description) return {};
   try {
@@ -282,6 +301,29 @@ function parseEmbeddedDescription(description: string | undefined) {
   } catch {
     return {};
   }
+}
+
+// Fuer neue Datensaetze wird "description" als reiner Freitext gespeichert.
+// Falls dort noch ein altes JSON steckt, geben wir absichtlich keinen Text zurueck.
+function extractFreeTextDescription(description: string | undefined): string | undefined {
+  if (!description) return undefined;
+  const trimmed = description.trim();
+  if (!trimmed) return undefined;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object") return undefined;
+  } catch {
+    // Kein JSON => erwarteter Freitext.
+  }
+  return trimmed;
+}
+
+// Liefert Ansprechpartner-Daten statt technischer Owner-ID.
+function mapHubSpotOwnerIdToContact(ownerId: unknown): VoltfangContactInfo | undefined {
+  if (ownerId === null || ownerId === undefined) return undefined;
+  const normalized = String(ownerId).trim();
+  if (!normalized) return undefined;
+  return HUBSPOT_OWNER_ID_TO_CONTACT[normalized] ?? { name: "Ansprechpartner fehlerhaft" };
 }
 
 // Endkunde-Name robust lesen (je nach Portal/Feldhistorie).
@@ -560,6 +602,10 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
   const fallbackProjectDto = (project: LocalProject) => ({
     id: project.id,
     name: project.name,
+    description: undefined,
+    vf_contact_name: undefined,
+    vf_contact_email: undefined,
+    vf_contact_phone: undefined,
     dealstage: "Eingangsprüfung",
     location_street: "",
     location_zip: "",
@@ -604,6 +650,7 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
           deal = await hubspotRequest(
             `/crm/v3/objects/deals/${project.hubspot_id}?properties=${[
               HUBSPOT_FIELDS.deal.name,
+              HUBSPOT_FIELDS.deal.ownerId,
               HUBSPOT_FIELDS.deal.stage,
               HUBSPOT_FIELDS.deal.estimatedOrderDate,
               HUBSPOT_FIELDS.deal.estimatedCapacity,
@@ -652,7 +699,9 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
         }
 
         // "description" als Fallback-Datenquelle nutzen.
-        const embedded = parseEmbeddedDescription(deal?.properties?.[HUBSPOT_FIELDS.deal.description]);
+        const rawDescription = deal?.properties?.[HUBSPOT_FIELDS.deal.description];
+        const embedded = parseEmbeddedDescription(rawDescription);
+        const freeTextDescription = extractFreeTextDescription(rawDescription);
 
         // Prioritaet:
         // 1) neues Feld "speicherkapazitat__kwh___angebot_"
@@ -660,6 +709,9 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
         const offeredCapacity =
           parseHubSpotNumber(deal?.properties?.[HUBSPOT_FIELDS.deal.offeredCapacity]) ??
           parseHubSpotNumber(deal?.properties?.amount);
+        const vfContact = mapHubSpotOwnerIdToContact(
+          deal?.properties?.[HUBSPOT_FIELDS.deal.ownerId],
+        );
 
         const creatorHubspotId = creatorHubspotByUserId.get(project.created_by_user_id);
         let creatorContact = null;
@@ -692,6 +744,10 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
         return {
           id: project.id,
           name: deal?.properties?.[HUBSPOT_FIELDS.deal.name] ?? project.name,
+          description: freeTextDescription,
+          vf_contact_name: vfContact?.name ?? embedded.vf_contact_name ?? undefined,
+          vf_contact_email: vfContact?.email ?? embedded.vf_contact_email ?? undefined,
+          vf_contact_phone: vfContact?.phone ?? embedded.vf_contact_phone ?? undefined,
           dealstage: normalizeDealstage(deal?.properties?.[HUBSPOT_FIELDS.deal.stage]),
           location_street:
             deal?.properties?.[HUBSPOT_FIELDS.deal.locationStreet] ?? embedded.location_street ?? "",
@@ -970,15 +1026,26 @@ async function getUserContext(localUser: {
   1) Endkunde anlegen (oder bei Duplikat wiederverwenden)
   2) Kontakt anlegen (oder bei Duplikat wiederverwenden)
   3) Deal anlegen
-  4) Deal mit Endkunde + Kontakt verknuepfen
-  5) Nur HubSpot-IDs + Minimaldaten in Supabase speichern
+  4) Deal mit Endkunde + Projektkontakt + Partner + Vermittlerkontakt verknuepfen
+  5) Direkte Kontakt<->Endkunde Association erstellen
+  6) Nur HubSpot-IDs + Minimaldaten in Supabase speichern
 */
 async function createProject(
-  localUser: { id: string; company_id: string | null },
+  localUser: { id: string; company_id: string | null; hubspot_id: number | null },
   payload: ProjectPayload,
 ) {
   if (!localUser.company_id) throw new Error("User has no company mapping");
+  if (!localUser.hubspot_id) throw new Error("User has no HubSpot contact mapping");
   if (!payload?.name) throw new Error("Project name is required");
+
+  // Das lokale Unternehmen muss auf ein HubSpot-Partnerobjekt zeigen.
+  const { data: localCompany, error: localCompanyError } = await supabaseAdmin
+    .from("usercompany")
+    .select("hubspot_id")
+    .eq("id", localUser.company_id)
+    .single();
+  if (localCompanyError) throw localCompanyError;
+  if (!localCompany?.hubspot_id) throw new Error("Company has no HubSpot partner mapping");
 
   // 1) Create project endkunde (custom object) in HubSpot.
   // If name is unique and already exists, re-use existing record instead of failing.
@@ -1033,7 +1100,7 @@ async function createProject(
   // 2) Create project contact in HubSpot (or re-use existing on email conflict)
   const hubspotContact = await createOrReuseContact(payload);
 
-  // 3) Create deal in HubSpot (store full form payload in description for retrieval)
+  // 3) Create deal in HubSpot
   const hubspotDeal = await hubspotRequest("/crm/v3/objects/deals", "POST", {
     properties: {
       [HUBSPOT_FIELDS.deal.name]: payload.name,
@@ -1046,11 +1113,11 @@ async function createProject(
       [HUBSPOT_FIELDS.deal.locationState]: payload.location_state,
       [HUBSPOT_FIELDS.deal.locationCountry]: payload.location_country,
       [HUBSPOT_FIELDS.deal.source]: "Vermittlerportal",
-      [HUBSPOT_FIELDS.deal.description]: JSON.stringify(payload),
+      [HUBSPOT_FIELDS.deal.description]: payload.description?.trim() || undefined,
     },
   });
 
-  // 4) Associate deal <-> endkunde(custom object) and deal <-> contact
+  // 4) Associate deal <-> endkunde(custom object) and deal <-> project contact
   await hubspotRequest(
     `/crm/v4/objects/deals/${hubspotDeal.id}/associations/default/${HUBSPOT_ENDKUNDE_OBJECT_TYPE}/${hubspotEndkunde.id}`,
     "PUT",
@@ -1063,6 +1130,22 @@ async function createProject(
   // 5) Zusätzlich direkte Association Kontakt <-> Endkunde erstellen.
   // So bleibt die Beziehung auch ohne Deal-Kontext in HubSpot sichtbar.
   await associateContactWithEndkunde(hubspotContact.id, hubspotEndkunde.id);
+
+  // Deal <-> Partner (Vermittlerunternehmen) verknuepfen.
+  await hubspotRequest(
+    `/crm/v4/objects/deals/${hubspotDeal.id}/associations/default/${HUBSPOT_PARTNER_OBJECT_TYPE}/${localCompany.hubspot_id}`,
+    "PUT",
+  );
+
+  // Deal <-> eingeloggter Vermittlerkontakt verknuepfen.
+  // Falls Projektkontakt und Vermittlerkontakt identisch sind, keine zweite Association senden.
+  const projectContactId = toHubSpotId(hubspotContact.id);
+  if (projectContactId !== localUser.hubspot_id) {
+    await hubspotRequest(
+      `/crm/v4/objects/deals/${hubspotDeal.id}/associations/default/contacts/${localUser.hubspot_id}`,
+      "PUT",
+    );
+  }
 
   const projectRow = {
     name: payload.name,

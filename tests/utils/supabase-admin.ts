@@ -402,11 +402,6 @@ const HUBSPOT_BASE_URL = 'https://api.hubapi.com';
 const HUBSPOT_ENDKUNDE_OBJECT_TYPE = process.env.HUBSPOT_ENDKUNDE_OBJECT_TYPE || '2-57928694';
 const HUBSPOT_PARTNER_OBJECT_TYPE = process.env.HUBSPOT_PARTNER_OBJECT_TYPE || '2-57928699';
 
-type HubSpotListResponse = {
-  results?: Array<{ id?: string }>;
-  paging?: { next?: { after?: string } };
-};
-
 async function hubspotRequest(path: string, init?: RequestInit): Promise<Response> {
   const token = process.env.HUBSPOT_ACCESS_TOKEN;
   if (!token) {
@@ -424,57 +419,6 @@ async function hubspotRequest(path: string, init?: RequestInit): Promise<Respons
   return response;
 }
 
-async function listHubSpotObjectIds(objectType: string): Promise<string[]> {
-  const ids: string[] = [];
-  let after: string | undefined;
-  let pages = 0;
-
-  while (pages < 500) {
-    const query = new URLSearchParams({
-      limit: '100',
-      archived: 'false',
-    });
-    if (after) query.set('after', after);
-
-    const response = await hubspotRequest(`/crm/v3/objects/${objectType}?${query.toString()}`);
-    if (!response.ok) {
-      throw new Error(`HubSpot-Liste fehlgeschlagen (${objectType}): ${await response.text()}`);
-    }
-
-    const payload = (await response.json()) as HubSpotListResponse;
-    const batchIds = (payload.results || [])
-      .map(item => item.id)
-      .filter((id): id is string => Boolean(id));
-    ids.push(...batchIds);
-
-    const nextAfter = payload.paging?.next?.after;
-    if (!nextAfter) break;
-    after = nextAfter;
-    pages += 1;
-  }
-
-  return ids;
-}
-
-async function deleteHubSpotObjectsByType(objectType: string): Promise<number> {
-  const ids = await listHubSpotObjectIds(objectType);
-  let deleted = 0;
-
-  for (const id of ids) {
-    const response = await hubspotRequest(`/crm/v3/objects/${objectType}/${id}`, {
-      method: 'DELETE',
-    });
-    // Bereits gelöschte/fehlende Datensätze brechen den Cleanup nicht ab.
-    if (response.ok || response.status === 404) {
-      deleted += 1;
-      continue;
-    }
-    console.error(`Fehler beim Löschen von HubSpot-Objekt ${objectType}/${id}:`, await response.text());
-  }
-
-  return deleted;
-}
-
 async function deleteHubSpotObjectsByIds(objectType: string, ids: Array<string | number>): Promise<number> {
   let deleted = 0;
   for (const rawId of ids) {
@@ -490,55 +434,4 @@ async function deleteHubSpotObjectsByIds(objectType: string, ids: Array<string |
     console.error(`Fehler beim Löschen von HubSpot-Objekt ${objectType}/${id}:`, await response.text());
   }
   return deleted;
-}
-
-/**
- * VOLLSTÄNDIGER RESET für E2E:
- * - Supabase: project, user, usercompany + auth.users
- * - HubSpot: deals, contacts, Partner, Endkunde
- *
- * Sicherheitsgurt:
- * Setze ALLOW_DESTRUCTIVE_E2E_RESET=true, um diese Funktion bewusst auszuführen.
- */
-export async function cleanupAllHubSpotAndSupabaseData(): Promise<void> {
-  if (process.env.ALLOW_DESTRUCTIVE_E2E_RESET !== 'true') {
-    throw new Error(
-      'Destruktiver Reset blockiert. Setze ALLOW_DESTRUCTIVE_E2E_RESET=true, um den Full-Cleanup auszuführen.'
-    );
-  }
-
-  // 1) Supabase-Daten löschen (Mappings + Auth)
-  await supabaseAdmin.from('project').delete().not('id', 'is', null);
-  await supabaseAdmin.from('user').delete().not('id', 'is', null);
-  await supabaseAdmin.from('usercompany').delete().not('id', 'is', null);
-
-  let page = 1;
-  let deletedAuthUsers = 0;
-  while (page <= 50) {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw error;
-    const users = data?.users || [];
-    if (!users.length) break;
-
-    for (const user of users) {
-      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
-      if (deleteError) {
-        console.error(`Fehler beim Löschen Auth-User ${user.id}:`, deleteError);
-        continue;
-      }
-      deletedAuthUsers += 1;
-    }
-
-    if (users.length < 200) break;
-  }
-
-  // 2) HubSpot-Daten löschen (Reihenfolge erst Deals, dann Objekte/Kontakte)
-  const deletedDeals = await deleteHubSpotObjectsByType('deals');
-  const deletedEndkunden = await deleteHubSpotObjectsByType(HUBSPOT_ENDKUNDE_OBJECT_TYPE);
-  const deletedPartners = await deleteHubSpotObjectsByType(HUBSPOT_PARTNER_OBJECT_TYPE);
-  const deletedContacts = await deleteHubSpotObjectsByType('contacts');
-
-  console.log(
-    `Full-Cleanup abgeschlossen: Auth-Users=${deletedAuthUsers}, Deals=${deletedDeals}, Endkunden=${deletedEndkunden}, Partner=${deletedPartners}, Kontakte=${deletedContacts}`
-  );
 }

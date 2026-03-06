@@ -30,7 +30,7 @@ Es gibt jetzt 3 Ebenen:
    - `users.atomic.spec.ts` -> erstellt 3 Nutzer
    - `projects.atomic.spec.ts` -> legt 1 Projekt pro Nutzerprofil an (also 3)
    - `three-users-three-projects.atomic.spec.ts` -> grosser Gesamtlauf (3 Nutzer + 3 Projekte)
-   - `full-reset-hubspot-supabase.atomic.spec.ts` -> destruktiver Voll-Reset in HubSpot + Supabase
+   - `registration-no-cleanup.atomic.spec.ts` -> registriert einen neuen User inkl. Freischaltung (ohne Cleanup)
 
 3. **Full Suite**  
    Ein uebergeordneter Test (`registration-flow.spec.ts`), der beide Atomic-Flows
@@ -92,8 +92,23 @@ cd /Users/davidsanders/Documents/GitHub/voltfang-vermittler-portal-v2
   - `./node_modules/.bin/playwright test tests/atomic/projects.atomic.spec.ts`
 - Grosser 3-User/3-Projekt-Lauf:
   - `./node_modules/.bin/playwright test tests/atomic/three-users-three-projects.atomic.spec.ts`
-- Vollständiger Reset (destruktiv, nur bewusst nutzen):
-  - `ALLOW_DESTRUCTIVE_E2E_RESET=true ./node_modules/.bin/playwright test tests/atomic/full-reset-hubspot-supabase.atomic.spec.ts`
+- Registrierung ohne Cleanup:
+  - `./node_modules/.bin/playwright test tests/atomic/registration-no-cleanup.atomic.spec.ts`
+
+### Full-Reset als Skript (Best Practice)
+
+Der destruktive Komplett-Reset laeuft **nicht mehr als Test**, sondern als
+vorgefertigtes Skript:
+
+- Dry-Run (empfohlen, loescht nichts):
+  - `npm run reset:full:dry`
+- Echter Lauf (destruktiv):
+  - `npm run reset:full`
+
+Sicherheitsgurt:
+
+- Das Skript loescht nur, wenn `ALLOW_DESTRUCTIVE_E2E_RESET=true` gesetzt ist
+  und die Bestaetigung `--confirm` aktiv ist (im npm-Script bereits enthalten).
 
 ### Full Suite
 
@@ -108,8 +123,6 @@ cd /Users/davidsanders/Documents/GitHub/voltfang-vermittler-portal-v2
   - `./node_modules/.bin/playwright test --grep @atomic-projects`
 - `@atomic-3users-3projects`:
   - `./node_modules/.bin/playwright test --grep @atomic-3users-3projects`
-- `@atomic-full-reset`:
-  - `ALLOW_DESTRUCTIVE_E2E_RESET=true ./node_modules/.bin/playwright test --grep @atomic-full-reset`
 - `@full-suite`:
   - `./node_modules/.bin/playwright test --grep @full-suite`
 

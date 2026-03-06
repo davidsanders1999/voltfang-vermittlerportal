@@ -34,16 +34,16 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     
     // Trace bei Fehlern für Debugging
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     
     // Viewport-Größe
     viewport: { width: 1280, height: 720 },
   },
 
   // Timeout-Einstellungen
-  timeout: 60000, // 60 Sekunden pro Test
+  timeout: 90000, // 90 Sekunden pro Test (HubSpot-Calls dauern länger)
   expect: {
-    timeout: 10000, // 10 Sekunden für Assertions
+    timeout: 15000, // 15 Sekunden für Assertions
   },
 
   // Projekte/Browser-Konfiguration
@@ -54,11 +54,11 @@ export default defineConfig({
     },
   ],
 
-  // Dev-Server automatisch starten (optional)
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:5173',
-  //   reuseExistingServer: !process.env.CI,
-  //   timeout: 120000,
-  // },
+  // Dev-Server automatisch starten
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
 });
