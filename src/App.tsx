@@ -145,6 +145,14 @@ const App: React.FC = () => {
     setCurrentView(view);
   };
 
+  const getContentAnimationKey = () => {
+    // Einheitlicher Key pro Seite: erzwingt eine sanfte Re-Animation beim Wechsel.
+    if (currentView === 'projekte' && activeProjectId) {
+      return `${currentView}-${activeProjectId}`;
+    }
+    return currentView;
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard': 
@@ -497,7 +505,10 @@ const App: React.FC = () => {
         />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+          <div
+            key={getContentAnimationKey()}
+            className="max-w-7xl mx-auto space-y-8 page-render-enter"
+          >
             {renderContent()}
           </div>
         </main>

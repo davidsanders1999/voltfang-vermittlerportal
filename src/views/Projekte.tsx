@@ -31,17 +31,24 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
   
   const [loading, setLoading] = useState(true);
 
+  const getProjectsCacheKey = () =>
+    userProfile?.company_id ? `hubspot_context_projects_${userProfile.company_id}` : null;
+
   /**
    * Lädt alle Projekte des Unternehmens aus der Supabase 'project' Tabelle
    */
-  const fetchProjects = async () => {
+  const fetchProjects = async (showLoading = true) => {
     if (!userProfile?.company_id) return;
-    
-    setLoading(true);
+
+    if (showLoading) setLoading(true);
     try {
       const context = await getHubSpotContext();
       const data = context?.projects || [];
       setProjects(data);
+      const cacheKey = getProjectsCacheKey();
+      if (cacheKey) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+      }
       
       // Logik für Deep-Linking (falls initialProjectId vorhanden)
       if (initialProjectId) {
@@ -59,8 +66,30 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
 
   // Projekte laden, sobald die Komponente gemountet wird
   useEffect(() => {
-    fetchProjects();
-  }, [initialProjectId]);
+    const cacheKey = getProjectsCacheKey();
+    let hasCachedProjects = false;
+    if (cacheKey) {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as Project[];
+          setProjects(parsed);
+          setLoading(false);
+          hasCachedProjects = parsed.length > 0;
+          if (initialProjectId) {
+            const project = parsed.find((p) => p.id === initialProjectId);
+            if (project) setSelectedProject(project);
+          }
+        } catch {
+          // Ignorieren und normal frisch laden.
+        }
+      }
+    }
+
+    // Hintergrund-Refresh: wenn Cache da ist ohne harten Loader.
+    fetchProjects(!hasCachedProjects);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProjectId, userProfile?.company_id]);
 
   // Ladeanzeige
   if (loading && projects.length === 0) {
@@ -81,7 +110,7 @@ const Projekte: React.FC<ProjekteProps> = ({ initialProjectId, userProfile }) =>
         onBack={() => setShowForm(false)} 
         onSubmit={() => {
           setShowForm(false);
-          fetchProjects(); // Nach erfolgreichem Erstellen Liste neu laden
+          fetchProjects(false); // Nach erfolgreichem Erstellen Liste neu laden
         }} 
       />
     );

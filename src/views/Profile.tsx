@@ -88,13 +88,17 @@ const Profile: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const fetchProfileData = async () => {
-    setLoading(true);
+  const getProfileCacheKey = () => 'hubspot_user_context_profile';
+
+  const fetchProfileData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const context = await getHubSpotUserContext();
       setProfile((context?.user ?? null) as User | null);
       setCompany((context?.company ?? null) as (UserCompany & { invite_code?: string }) | null);
       setTeamMembers((context?.team_members ?? []) as TeamMember[]);
+      setError(null);
+      sessionStorage.setItem(getProfileCacheKey(), JSON.stringify(context ?? {}));
     } catch (error) {
       console.error('Fehler beim Laden des Profils:', error);
       setError('Profil konnte nicht geladen werden.');
@@ -104,7 +108,29 @@ const Profile: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchProfileData();
+    let hasCachedData = false;
+    const cached = sessionStorage.getItem(getProfileCacheKey());
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as {
+          user?: User | null;
+          company?: (UserCompany & { invite_code?: string }) | null;
+          team_members?: TeamMember[];
+        };
+        if (parsed?.user) {
+          setProfile(parsed.user);
+          setCompany((parsed.company ?? null) as (UserCompany & { invite_code?: string }) | null);
+          setTeamMembers((parsed.team_members ?? []) as TeamMember[]);
+          setLoading(false);
+          hasCachedData = true;
+        }
+      } catch {
+        // Cache ignorieren und frisch laden.
+      }
+    }
+
+    // Immer im Hintergrund aktualisieren, mit Loader nur ohne Cache.
+    fetchProfileData(!hasCachedData);
   }, []);
 
   const copyCode = async () => {
@@ -216,15 +242,15 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Status-Meldungen */}
       {success && (
-        <div className="bg-green-50 border border-green-100 text-green-600 px-6 py-4 rounded-2xl text-xs font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+        <div className="bg-green-50 border border-green-100 text-green-600 px-6 py-4 rounded-2xl text-xs font-bold flex items-center gap-3">
           <ShieldCheck size={18} /> Profil erfolgreich aktualisiert!
         </div>
       )}
       {error && (
-        <div className="bg-red-50 border border-red-100 text-red-600 px-6 py-4 rounded-2xl text-xs font-bold animate-in fade-in slide-in-from-top-2">
+        <div className="bg-red-50 border border-red-100 text-red-600 px-6 py-4 rounded-2xl text-xs font-bold">
           {error}
         </div>
       )}
@@ -253,7 +279,7 @@ const Profile: React.FC = () => {
               </div>
             </div>
             {isEditing && EDITING_ENABLED ? (
-              <div className="flex gap-3 animate-in fade-in zoom-in duration-300">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setIsEditing(false)}
                   disabled={saving}
@@ -296,7 +322,7 @@ const Profile: React.FC = () => {
 
           <div className="space-y-6">
             {isEditing ? (
-              <div className="space-y-5 animate-in fade-in duration-500">
+              <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
                   <ProfileInput 
                     label="Vorname" 
@@ -365,7 +391,7 @@ const Profile: React.FC = () => {
           
           <div className="space-y-6">
             {isEditing ? (
-              <div className="space-y-5 animate-in fade-in duration-500">
+              <div className="space-y-5">
                 <ProfileInput 
                   label="Unternehmensname" 
                   icon={Building} 
@@ -443,7 +469,7 @@ const Profile: React.FC = () => {
 
       {/* TEAM-SEKTION */}
       {company && !isEditing && (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 space-y-6">
           <div className="flex items-center justify-between border-b border-slate-50 pb-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-slate-50 text-[#82a8a4] flex items-center justify-center">

@@ -208,6 +208,53 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+const HUBSPOT_BATCH_MAX = 100;
+const HUBSPOT_BATCH_CONCURRENCY = 5;
+const HUBSPOT_REQUEST_TIMEOUT_MS = 8000;
+const HUBSPOT_REQUEST_MAX_RETRIES = 2;
+const HUBSPOT_RETRY_BASE_DELAY_MS = 250;
+const CREATOR_CONTACT_CACHE_TTL_MS = 120_000;
+
+// Einfache Laufzeit-Metrik: Anzahl HubSpot-Calls pro Request.
+// Hinweis: In hochgradig parallelen Runs ist diese Metrik best effort.
+let hubspotRequestCount = 0;
+
+const creatorContactCache = new Map<string, { expiresAt: number; value: any }>();
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function chunkArray<T>(values: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < values.length; i += size) {
+    chunks.push(values.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function runWithConcurrencyLimit<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  if (tasks.length === 0) return [];
+  const safeLimit = Math.max(1, Math.min(limit, tasks.length));
+  const results: T[] = new Array(tasks.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: safeLimit }, async () => {
+    while (true) {
+      const current = nextIndex;
+      nextIndex += 1;
+      if (current >= tasks.length) break;
+      results[current] = await tasks[current]();
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
 // Einheitliche JSON-Antworten inkl. CORS-Header.
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -249,22 +296,94 @@ async function hubspotRequest(
   path: string,
   method: string,
   body?: Record<string, unknown>,
+  options?: {
+    timeoutMs?: number;
+    maxRetries?: number;
+  },
 ) {
-  const response = await fetch(`https://api.hubapi.com${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${HUBSPOT_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const timeoutMs = options?.timeoutMs ?? HUBSPOT_REQUEST_TIMEOUT_MS;
+  const maxRetries = options?.maxRetries ?? HUBSPOT_REQUEST_MAX_RETRIES;
+  let attempt = 0;
 
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`HubSpot request failed (${response.status}): ${details}`);
+  while (attempt <= maxRetries) {
+    hubspotRequestCount += 1;
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort("timeout"), timeoutMs);
+
+    try {
+      const response = await fetch(`https://api.hubapi.com${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const details = await response.text();
+        const retriable = response.status === 429 || response.status >= 500;
+        if (retriable && attempt < maxRetries) {
+          const backoff = HUBSPOT_RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 100);
+          await sleep(backoff);
+          attempt += 1;
+          continue;
+        }
+        throw new Error(`HubSpot request failed (${response.status}): ${details}`);
+      }
+
+      const raw = await response.text();
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    } catch (error) {
+      const isAbort =
+        error instanceof DOMException && error.name === "AbortError";
+      if ((isAbort || error instanceof TypeError) && attempt < maxRetries) {
+        const backoff = HUBSPOT_RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 100);
+        await sleep(backoff);
+        attempt += 1;
+        continue;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
   }
 
-  return response.json();
+  throw new Error("HubSpot request failed after retries");
+}
+
+async function batchReadHubspotObjects(
+  objectType: string,
+  ids: Array<number | string>,
+  properties: string[],
+) {
+  const normalizedIds = [...new Set(ids.map((id) => String(id)).filter(Boolean))];
+  if (normalizedIds.length === 0) return new Map<string, any>();
+
+  const resultMap = new Map<string, any>();
+  const chunks = chunkArray(normalizedIds, HUBSPOT_BATCH_MAX);
+  const tasks = chunks.map((chunk) => async () => {
+    const response = await hubspotRequest(
+      `/crm/v3/objects/${objectType}/batch/read`,
+      "POST",
+      {
+        properties,
+        inputs: chunk.map((id) => ({ id })),
+      },
+    );
+    for (const entry of response?.results ?? []) {
+      if (entry?.id) resultMap.set(String(entry.id), entry);
+    }
+  });
+
+  await runWithConcurrencyLimit(tasks, HUBSPOT_BATCH_CONCURRENCY);
+  return resultMap;
 }
 
 // Sicherheitspruefung: den Benutzer aus dem mitgesendeten Token aufloesen.
@@ -584,7 +703,6 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
   const projects = (projectsData ?? []) as LocalProject[];
   const creatorIds = [...new Set(projects.map((p) => p.created_by_user_id).filter(Boolean))];
   const creatorHubspotByUserId = new Map<string, number>();
-  const creatorContactCache = new Map<number, any>();
 
   if (creatorIds.length) {
     const { data: creatorRows, error: creatorRowsError } = await supabaseAdmin
@@ -637,66 +755,89 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
     hubspot_project_company_id: project.hubspot_project_company_id ?? undefined,
   });
 
+  const dealIds = projects
+    .map((project) => project.hubspot_id)
+    .filter((id): id is number => typeof id === "number");
+  const projectContactIds = projects
+    .map((project) => project.hubspot_project_contact_id)
+    .filter((id): id is number => typeof id === "number");
+  const endkundeIds = projects
+    .map((project) => project.hubspot_project_company_id)
+    .filter((id): id is number => typeof id === "number");
+  const creatorContactIds = [...new Set(
+    projects
+      .map((project) => creatorHubspotByUserId.get(project.created_by_user_id))
+      .filter((id): id is number => typeof id === "number"),
+  )];
+
+  let dealById = new Map<string, any>();
+  let contactById = new Map<string, any>();
+  let endkundeById = new Map<string, any>();
+
+  try {
+    [dealById, contactById, endkundeById] = await Promise.all([
+      batchReadHubspotObjects(
+        "deals",
+        dealIds,
+        [
+          HUBSPOT_FIELDS.deal.name,
+          HUBSPOT_FIELDS.deal.ownerId,
+          HUBSPOT_FIELDS.deal.stage,
+          HUBSPOT_FIELDS.deal.estimatedOrderDate,
+          HUBSPOT_FIELDS.deal.estimatedCapacity,
+          HUBSPOT_FIELDS.deal.offeredCapacity,
+          HUBSPOT_FIELDS.deal.locationStreet,
+          HUBSPOT_FIELDS.deal.locationZip,
+          HUBSPOT_FIELDS.deal.locationCity,
+          HUBSPOT_FIELDS.deal.locationState,
+          HUBSPOT_FIELDS.deal.locationCountry,
+          HUBSPOT_FIELDS.deal.source,
+          HUBSPOT_FIELDS.deal.description,
+          "amount",
+        ],
+      ),
+      batchReadHubspotObjects(
+        "contacts",
+        [...new Set([...projectContactIds, ...creatorContactIds])],
+        [
+          HUBSPOT_FIELDS.contact.salutation,
+          HUBSPOT_FIELDS.contact.firstName,
+          HUBSPOT_FIELDS.contact.lastName,
+          HUBSPOT_FIELDS.contact.role,
+          HUBSPOT_FIELDS.contact.email,
+          HUBSPOT_FIELDS.contact.phone,
+          HUBSPOT_FIELDS.contact.portalStatus,
+        ],
+      ),
+      batchReadHubspotObjects(
+        HUBSPOT_ENDKUNDE_OBJECT_TYPE,
+        endkundeIds,
+        [
+          HUBSPOT_FIELDS.endkunde.name,
+          HUBSPOT_FIELDS.endkunde.website,
+          HUBSPOT_FIELDS.endkunde.street,
+          HUBSPOT_FIELDS.endkunde.zip,
+          HUBSPOT_FIELDS.endkunde.city,
+          HUBSPOT_FIELDS.endkunde.state,
+          HUBSPOT_FIELDS.endkunde.country,
+        ],
+      ),
+    ]);
+  } catch (error) {
+    console.error("Batch hydration failed, fallback to local-only DTOs", error);
+  }
+
   const hydrated = await Promise.all(
     projects.map(async (project) => {
       try {
-        // Diese drei Objekte werden aus HubSpot geladen und anschliessend zusammengefuehrt.
-        let deal: any = null;
-        let contact: any = null;
-        let endkunde: any = null;
-
-        if (project.hubspot_id) {
-          // Deal-Daten inkl. geschaetzter und angebotener Kapazitaet laden.
-          deal = await hubspotRequest(
-            `/crm/v3/objects/deals/${project.hubspot_id}?properties=${[
-              HUBSPOT_FIELDS.deal.name,
-              HUBSPOT_FIELDS.deal.ownerId,
-              HUBSPOT_FIELDS.deal.stage,
-              HUBSPOT_FIELDS.deal.estimatedOrderDate,
-              HUBSPOT_FIELDS.deal.estimatedCapacity,
-              HUBSPOT_FIELDS.deal.offeredCapacity,
-              HUBSPOT_FIELDS.deal.locationStreet,
-              HUBSPOT_FIELDS.deal.locationZip,
-              HUBSPOT_FIELDS.deal.locationCity,
-              HUBSPOT_FIELDS.deal.locationState,
-              HUBSPOT_FIELDS.deal.locationCountry,
-              HUBSPOT_FIELDS.deal.source,
-              HUBSPOT_FIELDS.deal.description,
-              "amount",
-            ].join(",")}`,
-            "GET",
-          );
-        }
-        if (project.hubspot_project_contact_id) {
-          // Projektkontakt laden.
-          contact = await hubspotRequest(
-            `/crm/v3/objects/contacts/${project.hubspot_project_contact_id}?properties=${[
-              HUBSPOT_FIELDS.contact.salutation,
-              HUBSPOT_FIELDS.contact.firstName,
-              HUBSPOT_FIELDS.contact.lastName,
-              HUBSPOT_FIELDS.contact.role,
-              HUBSPOT_FIELDS.contact.email,
-              HUBSPOT_FIELDS.contact.phone,
-              HUBSPOT_FIELDS.contact.portalStatus,
-            ].join(",")}`,
-            "GET",
-          );
-        }
-        if (project.hubspot_project_company_id) {
-          // Endkunde (Custom Object) laden.
-          endkunde = await hubspotRequest(
-            `/crm/v3/objects/${HUBSPOT_ENDKUNDE_OBJECT_TYPE}/${project.hubspot_project_company_id}?properties=${[
-              HUBSPOT_FIELDS.endkunde.name,
-              HUBSPOT_FIELDS.endkunde.website,
-              HUBSPOT_FIELDS.endkunde.street,
-              HUBSPOT_FIELDS.endkunde.zip,
-              HUBSPOT_FIELDS.endkunde.city,
-              HUBSPOT_FIELDS.endkunde.state,
-              HUBSPOT_FIELDS.endkunde.country,
-            ].join(",")}`,
-            "GET",
-          );
-        }
+        // Diese drei Objekte werden via Batch-Reads geladen und hier zusammengefuehrt.
+        const deal = project.hubspot_id ? dealById.get(String(project.hubspot_id)) : null;
+        const contact = project.hubspot_project_contact_id
+          ? contactById.get(String(project.hubspot_project_contact_id))
+          : null;
+        const endkunde = project.hubspot_project_company_id
+          ? endkundeById.get(String(project.hubspot_project_company_id))
+          : null;
 
         // "description" als Fallback-Datenquelle nutzen.
         const rawDescription = deal?.properties?.[HUBSPOT_FIELDS.deal.description];
@@ -716,22 +857,17 @@ async function getContext(localUser: { id: string; company_id: string | null }) 
         const creatorHubspotId = creatorHubspotByUserId.get(project.created_by_user_id);
         let creatorContact = null;
         if (creatorHubspotId) {
-          if (contact && Number(project.hubspot_project_contact_id) === Number(creatorHubspotId)) {
-            creatorContact = contact;
-          } else if (creatorContactCache.has(creatorHubspotId)) {
-            creatorContact = creatorContactCache.get(creatorHubspotId);
+          const creatorCacheKey = String(creatorHubspotId);
+          const cached = creatorContactCache.get(creatorCacheKey);
+          if (cached && cached.expiresAt > Date.now()) {
+            creatorContact = cached.value;
           } else {
-            try {
-              creatorContact = await hubspotRequest(
-                `/crm/v3/objects/contacts/${creatorHubspotId}?properties=${[
-                  HUBSPOT_FIELDS.contact.firstName,
-                  HUBSPOT_FIELDS.contact.lastName,
-                ].join(",")}`,
-                "GET",
-              );
-              creatorContactCache.set(creatorHubspotId, creatorContact);
-            } catch {
-              creatorContact = null;
+            creatorContact = contactById.get(creatorCacheKey) ?? null;
+            if (creatorContact) {
+              creatorContactCache.set(creatorCacheKey, {
+                value: creatorContact,
+                expiresAt: Date.now() + CREATOR_CONTACT_CACHE_TTL_MS,
+              });
             }
           }
         }
@@ -1182,14 +1318,23 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     if (!body?.action) return json({ error: "Missing action" }, 400);
+    const action = String(body.action);
+    const actionStartedAt = performance.now();
+    hubspotRequestCount = 0;
 
     // Registrierung/Join erfolgt direkt nach SignUp und kann ohne Session erfolgen.
     if (body.action === "register_partner") {
       const result = await registerPartner(body.payload as RegisterPartnerPayload);
+      console.log(
+        `[hubspot-projects] action=${action} duration_ms=${Math.round(performance.now() - actionStartedAt)} hubspot_calls=${hubspotRequestCount}`,
+      );
       return json(result, 201);
     }
     if (body.action === "join_partner_with_invite") {
       const result = await joinPartnerWithInvite(body.payload as JoinPartnerPayload);
+      console.log(
+        `[hubspot-projects] action=${action} duration_ms=${Math.round(performance.now() - actionStartedAt)} hubspot_calls=${hubspotRequestCount}`,
+      );
       return json(result, 201);
     }
 
@@ -1205,15 +1350,24 @@ Deno.serve(async (req) => {
 
     if (body.action === "get_context") {
       const context = await getContext(localUser);
+      console.log(
+        `[hubspot-projects] action=${action} duration_ms=${Math.round(performance.now() - actionStartedAt)} hubspot_calls=${hubspotRequestCount}`,
+      );
       return json(context);
     }
     if (body.action === "get_user_context") {
       const context = await getUserContext(localUser);
+      console.log(
+        `[hubspot-projects] action=${action} duration_ms=${Math.round(performance.now() - actionStartedAt)} hubspot_calls=${hubspotRequestCount}`,
+      );
       return json(context);
     }
 
     if (body.action === "create_project") {
       const created = await createProject(localUser, body.payload as ProjectPayload);
+      console.log(
+        `[hubspot-projects] action=${action} duration_ms=${Math.round(performance.now() - actionStartedAt)} hubspot_calls=${hubspotRequestCount}`,
+      );
       return json(created, 201);
     }
 

@@ -48,7 +48,7 @@ interface DashboardProps {
  * Kleine wiederverwendbare Karte für KPI-Kennzahlen
  */
 const KPICard = ({ title, value, change, isPositive, icon }: any) => (
-  <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+  <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
     <div className="flex justify-between items-start mb-3">
       <div className="p-2.5 rounded-xl bg-[#82a8a4]/10 text-[#82a8a4]">
         {icon}
@@ -75,6 +75,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const getDashboardCacheKey = () =>
+    userProfile?.company_id ? `hubspot_context_dashboard_${userProfile.company_id}` : null;
   
   /**
    * Formatiert Kapazitätswerte in kWh-Strings (z.B. 1.500 kWh oder 2,5 MWh)
@@ -89,11 +91,31 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!userProfile?.company_id) return;
-      
-      setLoading(true);
+
+      const cacheKey = getDashboardCacheKey();
+      let hasCachedProjects = false;
+      if (cacheKey) {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached) as Project[];
+            setProjects(parsed);
+            setLoading(false);
+            hasCachedProjects = parsed.length > 0;
+          } catch {
+            // Ignorieren und frisch laden.
+          }
+        }
+      }
+
+      if (!hasCachedProjects) setLoading(true);
       try {
         const context = await getHubSpotContext();
-        setProjects(context?.projects || []);
+        const nextProjects = context?.projects || [];
+        setProjects(nextProjects);
+        if (cacheKey) {
+          sessionStorage.setItem(cacheKey, JSON.stringify(nextProjects));
+        }
 
       } catch (error) {
         console.error('Fehler beim Laden der Dashboard-Daten:', error);
@@ -103,7 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     };
 
     fetchDashboardData();
-  }, [userProfile]);
+  }, [userProfile?.company_id]);
 
   /**
    * Berechnet die Daten für den monatlichen Kapazitätsverlauf (BarChart)
@@ -223,7 +245,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Willkommens-Bereich */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Willkommen zurück, {userProfile?.fname}!</h2>
           <p className="text-sm text-slate-500">Performance-Übersicht für {userCompany?.name}</p>
@@ -257,7 +279,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Hauptgrafiken */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Linke Seite: Monatlicher Kapazitätsverlauf */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Monatsverlauf abgeschlossener Aufträge</h3>
             <div className="flex items-center gap-3">
@@ -333,7 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Rechte Seite: Pipeline Funnel & Abschlussquote */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-5">Pipeline Funnel</h3>
           
           {/* Aktive Pipeline-Phasen mit Balken */}
@@ -399,12 +421,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Sektion: Neueste Projekte (Kurzübersicht) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ihre neuesten Projekte</h3>
           <button 
             onClick={() => onNavigate('projekte')}
-            className="text-[10px] font-bold text-[#82a8a4] hover:underline flex items-center gap-1 uppercase tracking-widest"
+            className="text-[10px] font-bold text-[#82a8a4] flex items-center gap-1 uppercase tracking-widest"
           >
             Alle Projekte <ArrowRight size={14} />
           </button>
@@ -433,10 +455,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <tr 
                       key={p.id} 
                       onClick={() => onNavigateToProject(p.id)}
-                      className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                      className="group cursor-pointer"
                     >
                       <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-slate-800 group-hover:text-[#82a8a4] transition-colors">{p.name}</p>
+                        <p className="text-xs font-bold text-slate-800">{p.name}</p>
                         <p className="text-[10px] text-slate-400 font-medium">{p.unternehmen_name}</p>
                       </td>
                       <td className="px-6 py-4 text-xs font-bold text-slate-700">
