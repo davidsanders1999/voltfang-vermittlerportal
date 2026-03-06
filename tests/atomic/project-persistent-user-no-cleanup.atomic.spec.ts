@@ -21,8 +21,8 @@ import {
 } from '../utils/supabase-admin';
 
 const PERSISTENT_USER: UserSeed = {
-  email: 'e2eatomic.persistent.owner@mailinator.com',
-  password: 'TestPasswort123!',
+  email: 'david.sanders@online.de',
+  password: '123456789',
   salutation: 'Herr',
   fname: 'Persistent',
   lname: 'Owner',
